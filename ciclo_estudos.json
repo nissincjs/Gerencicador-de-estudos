@@ -5,43 +5,46 @@
       "nome": "Língua Portuguesa",
       "questoes_prova": 10.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Língua Inglesa",
       "questoes_prova": 5.0,
       "peso_questao": 1.0,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Matemática",
       "questoes_prova": 5.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Atualidades do Mercado Financeiro",
       "questoes_prova": 5.0,
       "peso_questao": 1.0,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Probabilidade e Estatística",
       "questoes_prova": 5.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Conhecimentos Bancários",
       "questoes_prova": 5.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     },
     {
       "nome": "Tecnologia da Informação",
       "questoes_prova": 35.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
+      "porcentagem_acertos": 0.0
     }
-  ]
+  ],
+  "data_inicio_ciclo": "07/06/2026 20:30:39",
+  "progresso_atual": {},
+  "historico_ciclos": []
 }

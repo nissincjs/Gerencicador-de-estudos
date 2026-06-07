@@ -20,14 +20,14 @@ def exibir_ciclo(dados, pausar=True):
         
     w_quest = 6
     w_peso = 7
-    w_dif = 3
+    w_acerto = 8
     w_meta = 9
     w_estudado = 9
     w_restante = 9
     
     # Calcula a largura total da tabela para alinhar perfeitamente cabeçalho, divisores e bordas
-    # (7 colunas + 7 separadores de 2 espaços + 8 barras verticais = w_materia + w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22)
-    largura_tabela = w_materia + w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22
+    # (7 colunas + 7 separadores de 2 espaços + 8 barras verticais = w_materia + w_quest + w_peso + w_acerto + w_meta + w_estudado + w_restante + 22)
+    largura_tabela = w_materia + w_quest + w_peso + w_acerto + w_meta + w_estudado + w_restante + 22
     
     # Exibe o cabeçalho ajustado para a largura dinâmica da tabela
     print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
@@ -59,7 +59,8 @@ def exibir_ciclo(dados, pausar=True):
     for m in materias:
         questoes_prova = m.get("questoes_prova", 10.0)
         peso_questao = m.get("peso_questao", 1.0)
-        dificuldade = m.get("dificuldade", 1.0)
+        porcentagem = m.get("porcentagem_acertos", 0.0)
+        dificuldade = calcular_dificuldade(porcentagem)
         
         fator = (questoes_prova * peso_questao) * dificuldade
         fator_total += fator
@@ -68,6 +69,7 @@ def exibir_ciclo(dados, pausar=True):
             "nome": m["nome"],
             "questoes_prova": questoes_prova,
             "peso_questao": peso_questao,
+            "porcentagem_acertos": porcentagem,
             "dificuldade": dificuldade,
             "fator": fator
         })
@@ -76,15 +78,15 @@ def exibir_ciclo(dados, pausar=True):
     materias_calculadas.sort(key=lambda x: x["fator"], reverse=True)
 
     # Desenho da Tabela de Progresso
-    border_top = C_CYAN + "┌" + "─"*(w_materia+2) + "┬" + "─"*(w_quest+2) + "┬" + "─"*(w_peso+2) + "┬" + "─"*(w_dif+2) + "┬" + "─"*(w_meta+2) + "┬" + "─"*(w_estudado+2) + "┬" + "─"*(w_restante+2) + "┐" + C_RESET
-    border_mid = C_CYAN + "├" + "─"*(w_materia+2) + "┼" + "─"*(w_quest+2) + "┼" + "─"*(w_peso+2) + "┼" + "─"*(w_dif+2) + "┼" + "─"*(w_meta+2) + "┼" + "─"*(w_estudado+2) + "┼" + "─"*(w_restante+2) + "┤" + C_RESET
-    border_bot = C_CYAN + "└" + "─"*(w_materia+2) + "┴" + "─"*(w_quest+2) + "┴" + "─"*(w_peso+2) + "┴" + "─"*(w_dif+2) + "┴" + "─"*(w_meta+2) + "┴" + "─"*(w_estudado+2) + "┴" + "─"*(w_restante+2) + "┘" + C_RESET
+    border_top = C_CYAN + "┌" + "─"*(w_materia+2) + "┬" + "─"*(w_quest+2) + "┬" + "─"*(w_peso+2) + "┬" + "─"*(w_acerto+2) + "┬" + "─"*(w_meta+2) + "┬" + "─"*(w_estudado+2) + "┬" + "─"*(w_restante+2) + "┐" + C_RESET
+    border_mid = C_CYAN + "├" + "─"*(w_materia+2) + "┼" + "─"*(w_quest+2) + "┼" + "─"*(w_peso+2) + "┼" + "─"*(w_acerto+2) + "┼" + "─"*(w_meta+2) + "┼" + "─"*(w_estudado+2) + "┼" + "─"*(w_restante+2) + "┤" + C_RESET
+    border_bot = C_CYAN + "└" + "─"*(w_materia+2) + "┴" + "─"*(w_quest+2) + "┴" + "─"*(w_peso+2) + "┴" + "─"*(w_acerto+2) + "┴" + "─"*(w_meta+2) + "┴" + "─"*(w_estudado+2) + "┴" + "─"*(w_restante+2) + "┘" + C_RESET
 
     header = (
         C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_materia}} " +
         C_CYAN + "│" + C_RESET + f" {'Quest.':>{w_quest}} " +
         C_CYAN + "│" + C_RESET + f" {'Peso Q.':>{w_peso}} " +
-        C_CYAN + "│" + C_RESET + f" {'Dif':>{w_dif}} " +
+        C_CYAN + "│" + C_RESET + f" {'% Acert':>{w_acerto}} " +
         C_CYAN + "│" + C_RESET + f" {'Meta':>{w_meta}} " +
         C_CYAN + "│" + C_RESET + f" {'Estudado':>{w_estudado}} " +
         C_CYAN + "│" + C_RESET + f" {'Restante':>{w_restante}} " +
@@ -119,11 +121,17 @@ def exibir_ciclo(dados, pausar=True):
         
         restante_exibicao = f"{C_GREEN}{restante_formatada:>{w_restante}}{C_RESET}" if restante_formatada == "Concluído" else f"{restante_formatada:>{w_restante}}"
         
+        pct_acertos_str = f"{mc['porcentagem_acertos']:.1f}%"
+        if mc['porcentagem_acertos'] >= 90.0:
+            pct_acertos_exibicao = f"{C_GREEN}{C_BOLD}{pct_acertos_str:>{w_acerto}}{C_RESET}"
+        else:
+            pct_acertos_exibicao = f"{pct_acertos_str:>{w_acerto}}"
+
         print(
             C_CYAN + "│" + C_RESET + f" {nome_trunc:<{w_materia}} " +
             C_CYAN + "│" + C_RESET + f" {mc['questoes_prova']:>{w_quest}.1f} " +
             C_CYAN + "│" + C_RESET + f" {mc['peso_questao']:>{w_peso}.1f} " +
-            C_CYAN + "│" + C_RESET + f" {mc['dificuldade']:>{w_dif}.1f} " +
+            C_CYAN + "│" + C_RESET + " " + pct_acertos_exibicao + " " +
             C_CYAN + "│" + C_RESET + f" {meta_formatada:>{w_meta}} " +
             C_CYAN + "│" + C_RESET + f" {estudado_formatada:>{w_estudado}} " +
             C_CYAN + "│" + C_RESET + f" {restante_exibicao} " +
@@ -137,6 +145,13 @@ def exibir_ciclo(dados, pausar=True):
     pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0
     print(f"\n{C_BOLD}Progresso Geral do Ciclo:{C_RESET} {C_GREEN}{total_estudado:.1f}h / {horas_totais}h ({pct_concluido:.1f}% concluído){C_RESET}")
     print(f"{C_BOLD}Fator de Relevância Total:{C_RESET} {fator_total:.1f}")
+    
+    # Sugestão de evolução
+    evolutivas = [mc["nome"] for mc in materias_calculadas if mc["porcentagem_acertos"] >= 90.0]
+    if evolutivas:
+        print(f"\n  {C_YELLOW}💡 SUGESTÃO DE EVOLUÇÃO (>= 90% de acertos):{C_RESET}")
+        for nome_ev in evolutivas:
+            print(f"    • {C_BOLD}{nome_ev}{C_RESET}: Ótimo rendimento! Você já pode adicionar novos assuntos / cadernos de questões.")
     
     if pausar:
         print(C_CYAN + "─" * largura_tabela + C_RESET)
@@ -160,14 +175,18 @@ def adicionar_materia(dados):
     peso_questao = obter_input_float("Peso de cada questão (ex: 1, 1.5, 2): ", min_val=0.1)
     
     print()
-    mostrar_guia_dificuldade()
-    dificuldade = obter_input_float("Dificuldade da matéria (1 a 5): ", min_val=1.0, max_val=5.0)
+    mostrar_guia_porcentagem()
+    iniciando = obter_input_sim_nao("Está iniciando nesta matéria agora? (S/N): ")
+    if iniciando:
+        porcentagem = 0.0
+    else:
+        porcentagem = obter_input_porcentagem("Quantos % de acerto você está tendo nesta matéria? ")
     
     dados["materias"].append({
         "nome": nome,
         "questoes_prova": questoes_prova,
         "peso_questao": peso_questao,
-        "dificuldade": dificuldade
+        "porcentagem_acertos": porcentagem
     })
     
     salvar_dados(dados)
@@ -188,7 +207,8 @@ def editar_materia(dados):
     for i, m in enumerate(materias, start=1):
         qp = m.get("questoes_prova", 10.0)
         pq = m.get("peso_questao", 1.0)
-        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']} (Questões: {qp}, Peso Q.: {pq}, Dif: {m['dificuldade']})")
+        pct = m.get("porcentagem_acertos", 0.0)
+        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']} (Questões: {qp}, Peso Q.: {pq}, % Acertos: {pct:.1f}%)")
         
     print_divider()
     opcao = obter_input_float("Escolha o número da matéria para editar (ou 0 para cancelar): ", min_val=0, max_val=len(materias))
@@ -219,8 +239,13 @@ def editar_materia(dados):
     peso_questao = obter_input_float(f"Peso de cada questão [{pq_atual}]: ", min_val=0.1, default=pq_atual)
     
     print()
-    mostrar_guia_dificuldade()
-    dificuldade = obter_input_float(f"Dificuldade (1 a 5) [{materia['dificuldade']}]: ", min_val=1.0, max_val=5.0, default=materia['dificuldade'])
+    mostrar_guia_porcentagem()
+    pct_atual = materia.get("porcentagem_acertos", 0.0)
+    iniciando = obter_input_sim_nao(f"Está iniciando nesta matéria agora? (S/N) [N]: ", default="N")
+    if iniciando:
+        porcentagem = 0.0
+    else:
+        porcentagem = obter_input_porcentagem(f"Quantos % de acerto você está tendo nesta matéria? [{pct_atual}%]: ", default=pct_atual)
     
     # Se mudar o nome da matéria, também precisamos ajustar o progresso_atual
     velho_nome = materia['nome']
@@ -230,7 +255,7 @@ def editar_materia(dados):
     materia['nome'] = novo_nome
     materia['questoes_prova'] = questoes_prova
     materia['peso_questao'] = peso_questao
-    materia['dificuldade'] = dificuldade
+    materia['porcentagem_acertos'] = porcentagem
     
     salvar_dados(dados)
     print(f"\n{C_GREEN}✔ Matéria '{novo_nome}' atualizada com sucesso!{C_RESET}")
@@ -299,7 +324,9 @@ def verificar_conclusao_ciclo(dados):
     fator_total = 0.0
     materias_fator = {}
     for m in materias:
-        fator = (m["questoes_prova"] * m["peso_questao"]) * m["dificuldade"]
+        pct = m.get("porcentagem_acertos", 0.0)
+        dificuldade = calcular_dificuldade(pct)
+        fator = (m["questoes_prova"] * m["peso_questao"]) * dificuldade
         fator_total += fator
         materias_fator[m["nome"]] = fator
         
@@ -489,6 +516,46 @@ def exibir_historico(dados):
         
     input("Pressione Enter para voltar ao menu...")
 
+def atualizar_porcentagem_materia(dados):
+    """Permite atualizar rapidamente apenas a porcentagem de acertos de uma matéria."""
+    clear_screen()
+    print_header("ATUALIZAR % DE ACERTOS")
+    
+    materias = dados.get("materias", [])
+    if not materias:
+        print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada para atualizar porcentagem.{C_RESET}")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+        
+    for i, m in enumerate(materias, start=1):
+        pct = m.get("porcentagem_acertos", 0.0)
+        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']} (Atual: {C_GREEN}{pct:.1f}%{C_RESET})")
+        
+    print_divider()
+    opcao = obter_input_float("Escolha o número da matéria (ou 0 para cancelar): ", min_val=0, max_val=len(materias))
+    if opcao == 0:
+        return
+        
+    idx = int(opcao) - 1
+    materia = materias[idx]
+    
+    clear_screen()
+    print_header(f"MATÉRIA: {materia['nome']}")
+    mostrar_guia_porcentagem()
+    
+    pct_atual = materia.get("porcentagem_acertos", 0.0)
+    iniciando = obter_input_sim_nao(f"Está iniciando nesta matéria agora? (S/N) [N]: ", default="N")
+    if iniciando:
+        porcentagem = 0.0
+    else:
+        porcentagem = obter_input_porcentagem(f"Nova porcentagem de acertos (0 a 100) [{pct_atual}%]: ", default=pct_atual)
+        
+    materia['porcentagem_acertos'] = porcentagem
+    salvar_dados(dados)
+    
+    print(f"\n{C_GREEN}✔ Porcentagem de acertos de '{materia['nome']}' atualizada para {porcentagem:.1f}% com sucesso!{C_RESET}")
+    input("\nPressione Enter para retornar ao menu...")
+
 def configuracao_inicial(dados):
     """Guia o usuário na primeira configuração estratégica de estudos."""
     clear_screen()
@@ -503,14 +570,18 @@ def configuracao_inicial(dados):
     peso_questao = obter_input_float("Peso de cada questão (ex: 1, 1.5, 2): ", min_val=0.1)
     
     print()
-    mostrar_guia_dificuldade()
-    dificuldade = obter_input_float("Dificuldade da matéria (1 a 5): ", min_val=1.0, max_val=5.0)
+    mostrar_guia_porcentagem()
+    iniciando = obter_input_sim_nao("Está iniciando nesta matéria agora? (S/N): ")
+    if iniciando:
+        porcentagem = 0.0
+    else:
+        porcentagem = obter_input_porcentagem("Quantos % de acerto você está tendo nesta matéria? ")
     
     dados["materias"].append({
         "nome": nome,
         "questoes_prova": questoes_prova,
         "peso_questao": peso_questao,
-        "dificuldade": dificuldade
+        "porcentagem_acertos": porcentagem
     })
     
     dados["data_inicio_ciclo"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")

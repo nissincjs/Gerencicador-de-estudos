@@ -35,6 +35,13 @@ def carregar_dados():
                     if "peso" in m:
                         del m["peso"]
                         migrou = True
+                    if "porcentagem_acertos" not in m:
+                        dif = m.get("dificuldade", 5.0)
+                        m["porcentagem_acertos"] = float((5.0 - dif) * 25.0)
+                        migrou = True
+                    if "dificuldade" in m:
+                        del m["dificuldade"]
+                        migrou = True
                 
                 if migrou:
                     salvar_dados(dados)

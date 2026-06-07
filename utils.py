@@ -16,17 +16,49 @@ def print_divider():
     """Exibe uma linha divisória sólida em ciano (largura de UI_WIDTH colunas)."""
     print(C_CYAN + "─" * UI_WIDTH + C_RESET)
 
-def mostrar_guia_dificuldade():
-    """Exibe uma legenda explicativa sobre os níveis de dificuldade com base em acertos."""
+def mostrar_guia_porcentagem():
+    """Exibe uma legenda explicativa sobre a porcentagem de acertos e como ela afeta o ciclo."""
     inner_width = UI_WIDTH - 2
     print(C_YELLOW + "┌" + "─" * inner_width + "┐")
-    print("│" + " GUIA DE ESTIMATIVA DE DIFICULDADE (Baseado em acertos):".ljust(inner_width) + "│")
-    print("│" + "   1 - Ótimo domínio (>85% de acertos em questões)".ljust(inner_width) + "│")
-    print("│" + "   2 - Bom domínio (75% - 85% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   3 - Domínio médio (60% - 75% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   4 - Baixo rendimento (45% - 60% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   5 - Sem base ou assunto novo (<45% de acertos)".ljust(inner_width) + "│")
+    print("│" + " MÉTRICA DE DESEMPENHO (Porcentagem de Acertos):".ljust(inner_width) + "│")
+    print("│" + "   • 0% de acertos   -> Dificuldade 5.0 (Máxima prioridade/tempo)".ljust(inner_width) + "│")
+    print("│" + "   • 100% de acertos -> Dificuldade 1.0 (Mínima prioridade/tempo)".ljust(inner_width) + "│")
+    print("│" + "   • >= 90% acertos  -> Matéria elegível para EVOLUÇÃO (novos assuntos)".ljust(inner_width) + "│")
     print("└" + "─" * inner_width + "┘" + C_RESET)
+
+def calcular_dificuldade(porcentagem):
+    """Calcula a dificuldade (de 1.0 a 5.0) com base na porcentagem de acertos (0% a 100%)."""
+    return 5.0 - (porcentagem / 100.0) * 4.0
+
+def obter_input_sim_nao(prompt, default=None):
+    """Lê e valida uma entrada de Sim/Não (retorna True para Sim, False para Não)."""
+    while True:
+        entrada = input(prompt).strip().lower()
+        if not entrada and default is not None:
+            entrada = default.lower()
+        if entrada in ['s', 'sim', 'y', 'yes']:
+            return True
+        if entrada in ['n', 'nao', 'não', 'no']:
+            return False
+        print(f"{C_RED}Erro: Por favor, responda com S (Sim) ou N (Não).{C_RESET}")
+
+def obter_input_porcentagem(prompt, default=None):
+    """Lê e valida uma entrada de porcentagem (0 a 100)."""
+    while True:
+        entrada = input(prompt).strip()
+        if not entrada and default is not None:
+            return default
+        # Limpa espaços e sinal de %
+        entrada_limpa = entrada.replace("%", "").strip()
+        # Substitui vírgula por ponto para suportar float no padrão brasileiro
+        entrada_limpa = entrada_limpa.replace(",", ".")
+        try:
+            val = float(entrada_limpa)
+            if 0.0 <= val <= 100.0:
+                return val
+            print(f"{C_RED}Erro: A porcentagem deve estar entre 0 e 100.{C_RESET}")
+        except ValueError:
+            print(f"{C_RED}Erro: Por favor, insira uma porcentagem válida (ex: 85 ou 85.5%).{C_RESET}")
 
 def obter_input_float(prompt, min_val=None, max_val=None, default=None):
     """Lê e valida uma entrada decimal."""
