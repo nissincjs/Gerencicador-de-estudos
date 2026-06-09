@@ -45,6 +45,23 @@ def carregar_dados():
                         del m["peso"]
                         migrou = True
                 
+                for r in dados.get("revisoes", []):
+                    if "ease_factor" not in r:
+                        r["ease_factor"] = 2.5
+                        migrou = True
+                    if "historico_acertos" not in r:
+                        r["historico_acertos"] = [r["acertos_pct"]] if r.get("acertos_pct") is not None else []
+                        migrou = True
+                    if "historico_intervalos" not in r:
+                        r["historico_intervalos"] = [r["intervalo_dias"]] if r.get("intervalo_dias") is not None else []
+                        migrou = True
+                    if "historico_datas" not in r:
+                        r["historico_datas"] = [r["data_ultimo_estudo"]] if r.get("data_ultimo_estudo") is not None else []
+                        migrou = True
+                    if "historico_ease_factors" not in r:
+                        r["historico_ease_factors"] = [r.get("ease_factor", 2.5)]
+                        migrou = True
+                
                 if migrou:
                     salvar_dados(dados)
                     

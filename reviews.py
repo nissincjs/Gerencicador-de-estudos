@@ -41,41 +41,145 @@ def calcular_status_e_dias(data_proxima_str):
     except ValueError:
         return "N/A", 0
 
-def calcular_proxima_revisao(data_base_str, acertos_pct, intervalo_dias_atual=None, revisoes_feitas=0):
-    """
-    Calcula a data e intervalo da próxima revisão baseando-se no desempenho.
-    - Se acertos_pct for None: multiplicador é 1.0 (neutro)
-    - >= 85%: multiplicador 2.0 (excelente domínio, dobra o intervalo)
-    - >= 70%: multiplicador 1.5 (bom domínio, aumenta 1.5x)
-    - >= 50%: multiplicador 1.0 (médio domínio, repete o intervalo)
-    - < 50%: multiplicador 0.5 (baixo domínio, reduz pela metade)
-    """
-    if acertos_pct is None:
-        multiplier = 1.0
-    elif acertos_pct >= 85.0:
-        multiplier = 2.0
-    elif acertos_pct >= 70.0:
-        multiplier = 1.5
-    elif acertos_pct >= 50.0:
-        multiplier = 1.0
-    else:
-        multiplier = 0.5
+def arredondar_dias(dias):
+    """Realiza arredondamento matemático padrão (0.5 ou mais arredonda para cima)."""
+    return int(dias + 0.5) if dias >= 0 else int(dias - 0.5)
 
-    # Determina o intervalo base antes do multiplicador
+def calcular_proxima_revisao(
+    data_base_str,
+    acertos_pct,
+    intervalo_dias_atual=None,
+    revisoes_feitas=0,
+    ease_factor=2.5,
+    historico_acertos=None
+):
+    """
+    Calcula de forma inteligente a data e intervalo da próxima revisão baseando-se no desempenho.
+    - Se acertos_pct for None: mantém o ease_factor atual e multiplica o intervalo por ele.
+    - Se acertos_pct for informado:
+      - Calcula a média histórica recente para suavizar flutuações.
+      - Convertemos em nota (0 a 5).
+      - Ajustamos o ease_factor de forma contínua (estilo Anki/SM2).
+      - Se a nota/porcentagem for baixa (< 50% acertos), trata como lapso (reinicia intervalo para 1 dia).
+      - Se for alta, aumenta o espaçamento multiplicando o intervalo por ease_factor * performance_factor.
+      - Analisa a tendência recente (melhora constante dá bônus, queda constante dá penalidade).
+    """
+    if historico_acertos is None:
+        historico_acertos = []
+
+    ef_atual = ease_factor if ease_factor is not None else 2.5
+    
+    # Determina o intervalo base antes do cálculo
     if revisoes_feitas == 0 or intervalo_dias_atual is None:
-        intervalo_anterior = 10
+        intervalo_anterior = 3  # Padrão inicial
     else:
         intervalo_anterior = intervalo_dias_atual
 
-    novo_intervalo = int(round(intervalo_anterior * multiplier))
-    if novo_intervalo < 1:
-        novo_intervalo = 1
+    info_detalhes = []
+    info_detalhes.append(f"• Fator de Facilidade Atual (Ease Factor): {ef_atual:.2f}")
 
+    if acertos_pct is None:
+        # Sem nota resolvida, apenas repete progressão básica baseada no Ease Factor
+        multiplier = ef_atual
+        intervalo_raw = intervalo_anterior * multiplier
+        ef_novo = ef_atual
+        novo_intervalo = arredondar_dias(intervalo_raw)
+        
+        info_detalhes.append("• Nenhum exercício resolvido nesta revisão. Mantendo progressão padrão.")
+        info_detalhes.append(f"• Multiplicador aplicado: {ef_atual:.2f}x")
+        info_detalhes.append(f"• Intervalo matemático: {intervalo_raw:.2f} dias -> Arredondado para: {novo_intervalo} dias")
+        
+        peff = None
+        pavg = None
+    else:
+        # Filtra histórico válido (sem None)
+        historico_validos = [val for val in historico_acertos if val is not None]
+        
+        # Média recente (últimas 3 revisões)
+        if not historico_validos:
+            pavg = acertos_pct
+        else:
+            ultimos_historico = historico_validos[-3:]
+            pavg = sum(ultimos_historico) / len(ultimos_historico)
+            
+        # Suavização da porcentagem atual com a histórica
+        peff = 0.7 * acertos_pct + 0.3 * pavg
+        
+        # Mapeamento para nota SM2 (0 a 5)
+        grade = peff / 20.0
+        
+        # Ajuste contínuo do Ease Factor (SM2 adaptado)
+        delta_ef = 0.15 - (5.0 - grade) * (0.08 + (5.0 - grade) * 0.02)
+        ef_novo = ef_atual + delta_ef
+        
+        # Limita o Ease Factor entre 1.3 (padrão Anki) e 5.0
+        if ef_novo < 1.3:
+            ef_novo = 1.3
+        elif ef_novo > 5.0:
+            ef_novo = 5.0
+            
+        info_detalhes.append(f"• Porcentagem da revisão: {acertos_pct:.1f}%")
+        if historico_validos:
+            info_detalhes.append(f"• Média histórica recente: {pavg:.1f}%")
+            info_detalhes.append(f"• Porcentagem efetiva suavizada: {peff:.1f}%")
+        info_detalhes.append(f"• Ajuste no Ease Factor: {ef_atual:.2f} -> {ef_novo:.2f} (Variação: {delta_ef:+.2f})")
+        
+        # Verificação de lapso (esquecimento, acertos < 50%)
+        if peff < 50.0:
+            novo_intervalo = 1
+            info_detalhes.append("• ⚠ Desempenho abaixo do esperado (< 50%). Classificado como LAPSO!")
+            info_detalhes.append("• Intervalo reiniciado para 1 dia para reforço rápido.")
+            intervalo_raw = 1.0
+        else:
+            # Caso de sucesso (pass)
+            performance_factor = peff / 100.0
+            
+            if revisoes_feitas == 0:
+                # Primeira revisão (intervalo inicial proporcional à nota)
+                intervalo_raw = 3.0 * ef_novo * performance_factor
+                info_detalhes.append(f"• Primeira revisão: intervalo inicial calculado como 3d * EF ({ef_novo:.2f}) * Rendimento ({performance_factor:.2f}) = {intervalo_raw:.2f} dias")
+            else:
+                intervalo_raw = intervalo_anterior * ef_novo * performance_factor
+                info_detalhes.append(f"• Intervalo base: {intervalo_anterior}d * EF ({ef_novo:.2f}) * Rendimento ({performance_factor:.2f}) = {intervalo_raw:.2f} dias")
+            
+            # Análise de Tendência
+            historico_com_atual = historico_validos + [acertos_pct]
+            ultimos_3 = historico_com_atual[-3:]
+            
+            if len(ultimos_3) == 3:
+                # Melhora contínua
+                if ultimos_3[0] < ultimos_3[1] < ultimos_3[2]:
+                    intervalo_raw *= 1.10
+                    info_detalhes.append("• 📈 Bônus de Consistência (+10%): Desempenho em evolução contínua!")
+                # Queda contínua
+                elif ultimos_3[0] > ultimos_3[1] > ultimos_3[2]:
+                    intervalo_raw *= 0.85
+                    info_detalhes.append("• 📉 Penalidade de Declínio (-15%): Desempenho em queda contínua.")
+                
+                # Consistência em alta performance
+                if all(val >= 90.0 for val in ultimos_3):
+                    intervalo_raw *= 1.15
+                    info_detalhes.append("• 🌟 Bônus de Alta Performance (+15%): Últimas 3 revisões com acertos >= 90%!")
+            
+            novo_intervalo = arredondar_dias(intervalo_raw)
+            if novo_intervalo < 1:
+                novo_intervalo = 1
+                
+            info_detalhes.append(f"• Intervalo matemático final: {intervalo_raw:.2f} dias -> Arredondado para: {novo_intervalo} dias")
+
+    # Calcula a próxima data
     data_base = datetime.strptime(data_base_str, "%d/%m/%Y")
     data_proxima = data_base + timedelta(days=novo_intervalo)
     data_proxima_str = data_proxima.strftime("%d/%m/%Y")
+    
+    info_calculo = {
+        "detalhes": "\n".join(info_detalhes),
+        "ease_factor": ef_novo,
+        "peff": peff,
+        "pavg": pavg
+    }
 
-    return data_proxima_str, novo_intervalo, intervalo_anterior
+    return data_proxima_str, novo_intervalo, intervalo_anterior, ef_novo, info_calculo
 
 def desenhar_tabela_revisoes(lista_revisoes, titulo):
     """Exibe um cabeçalho e desenha uma tabela estilizada com as revisões fornecidas."""
@@ -192,8 +296,8 @@ def adicionar_revisao(dados):
             print(f"{C_RED}Erro: Digite um número válido ou deixe em branco.{C_RESET}")
             
     # Aplica o cálculo inicial
-    data_proxima, novo_intervalo, intervalo_anterior = calcular_proxima_revisao(
-        data_ultimo_estudo, acertos_pct, revisoes_feitas=0
+    data_proxima, novo_intervalo, intervalo_anterior, novo_ef, info = calcular_proxima_revisao(
+        data_ultimo_estudo, acertos_pct, revisoes_feitas=0, ease_factor=2.5, historico_acertos=[]
     )
     
     revisoes = dados.setdefault("revisoes", [])
@@ -208,14 +312,21 @@ def adicionar_revisao(dados):
         "revisoes_feitas": 0,
         "data_proxima_revisao": data_proxima,
         "intervalo_dias": novo_intervalo,
-        "intervalo_anterior": intervalo_anterior
+        "intervalo_anterior": intervalo_anterior,
+        "ease_factor": novo_ef,
+        "historico_acertos": [acertos_pct] if acertos_pct is not None else [],
+        "historico_intervalos": [novo_intervalo],
+        "historico_datas": [data_ultimo_estudo],
+        "historico_ease_factors": [novo_ef]
     }
     revisoes.append(nova_rev)
     salvar_dados(dados)
     
     print(f"\n{C_GREEN}✔ Revisão adicionada com sucesso!{C_RESET}")
     print(f"  • Assunto: {assunto}")
-    print(f"  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
+    print(f"\n{C_CYAN}📊 DETALHES DO CÁLCULO DE ESPAÇAMENTO INTELIGENTE:{C_RESET}")
+    print(info["detalhes"])
+    print(f"\n  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
     input("\nPressione Enter para continuar...")
 
 def ver_revisoes_opcao(dados, apenas_pendentes=False):
@@ -316,19 +427,59 @@ def editar_revisao(dados):
         except ValueError:
             print(f"{C_RED}Erro: Digite um número válido, 'limpar' ou deixe em branco.{C_RESET}")
             
-    # Recalcula a data de revisão futura baseando-se no intervalo_anterior e nos novos parâmetros
-    data_proxima, novo_intervalo, _ = calcular_proxima_revisao(
-        revisao['data_ultimo_estudo'],
-        revisao['acertos_pct'],
-        intervalo_dias_atual=revisao.get('intervalo_anterior', 10),
-        revisoes_feitas=revisao['revisoes_feitas']
-    )
+    # Recalcula a data de revisão futura baseando-se nos novos parâmetros e no histórico anterior
+    revisoes_feitas = revisao.get('revisoes_feitas', 0)
+    hist_acertos = revisao.get("historico_acertos", [])
+    hist_intervalos = revisao.get("historico_intervalos", [])
+    hist_datas = revisao.get("historico_datas", [])
+    hist_efs = revisao.get("historico_ease_factors", [])
+    
+    if revisoes_feitas == 0:
+        # Primeiro estudo
+        data_proxima, novo_intervalo, intervalo_anterior, novo_ef, info = calcular_proxima_revisao(
+            revisao['data_ultimo_estudo'],
+            revisao['acertos_pct'],
+            intervalo_dias_atual=None,
+            revisoes_feitas=0,
+            ease_factor=2.5,
+            historico_acertos=[]
+        )
+        revisao['ease_factor'] = novo_ef
+        revisao['historico_acertos'] = [revisao['acertos_pct']] if revisao['acertos_pct'] is not None else []
+        revisao['historico_intervalos'] = [novo_intervalo]
+        revisao['historico_datas'] = [revisao['data_ultimo_estudo']]
+        revisao['historico_ease_factors'] = [novo_ef]
+    else:
+        # Já tem revisões feitas. Pegamos o estado anterior à última conclusão.
+        ef_prev = hist_efs[-2] if len(hist_efs) >= 2 else 2.5
+        hist_acertos_prev = hist_acertos[:-1]
+        
+        # O intervalo de referência é o intervalo anterior à última revisão concluída
+        intervalo_ref = revisao.get('intervalo_anterior', 3)
+        
+        data_proxima, novo_intervalo, intervalo_anterior, novo_ef, info = calcular_proxima_revisao(
+            revisao['data_ultimo_estudo'],
+            revisao['acertos_pct'],
+            intervalo_dias_atual=intervalo_ref,
+            revisoes_feitas=revisoes_feitas,
+            ease_factor=ef_prev,
+            historico_acertos=hist_acertos_prev
+        )
+        revisao['ease_factor'] = novo_ef
+        revisao['historico_acertos'] = hist_acertos_prev + [revisao['acertos_pct']]
+        revisao['historico_intervalos'] = (hist_intervalos[:-1] if hist_intervalos else []) + [novo_intervalo]
+        revisao['historico_datas'] = (hist_datas[:-1] if hist_datas else []) + [revisao['data_ultimo_estudo']]
+        revisao['historico_ease_factors'] = (hist_efs[:-1] if hist_efs else []) + [novo_ef]
+
     revisao['data_proxima_revisao'] = data_proxima
     revisao['intervalo_dias'] = novo_intervalo
+    revisao['intervalo_anterior'] = intervalo_anterior
     
     salvar_dados(dados)
     print(f"\n{C_GREEN}✔ Revisão editada com sucesso!{C_RESET}")
-    print(f"  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
+    print(f"\n{C_CYAN}📊 DETALHES DO RECALCULO DE ESPAÇAMENTO:{C_RESET}")
+    print(info["detalhes"])
+    print(f"\n  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
     input("\nPressione Enter para continuar...")
 
 def remover_revisao(dados):
@@ -448,12 +599,21 @@ def concluir_revisao(dados):
     intervalo_atual = revisao['intervalo_dias']
     revisoes_feitas_nova = revisao['revisoes_feitas'] + 1
     
+    # Recupera histórico e fator de facilidade atuais
+    ef = revisao.get("ease_factor", 2.5)
+    hist_acertos = revisao.get("historico_acertos", [])
+    hist_intervalos = revisao.get("historico_intervalos", [])
+    hist_datas = revisao.get("historico_datas", [])
+    hist_efs = revisao.get("historico_ease_factors", [])
+    
     # Aplica o espaçamento usando o intervalo_dias atual da revisão como base para a próxima!
-    data_proxima, novo_intervalo, intervalo_anterior = calcular_proxima_revisao(
+    data_proxima, novo_intervalo, intervalo_anterior, novo_ef, info = calcular_proxima_revisao(
         data_revisao,
         acertos_pct,
         intervalo_dias_atual=intervalo_atual,
-        revisoes_feitas=revisoes_feitas_nova
+        revisoes_feitas=revisoes_feitas_nova,
+        ease_factor=ef,
+        historico_acertos=hist_acertos
     )
     
     revisao['data_ultimo_estudo'] = data_revisao
@@ -462,11 +622,20 @@ def concluir_revisao(dados):
     revisao['data_proxima_revisao'] = data_proxima
     revisao['intervalo_dias'] = novo_intervalo
     revisao['intervalo_anterior'] = intervalo_anterior
+    revisao['ease_factor'] = novo_ef
+    
+    # Atualiza históricos
+    revisao['historico_acertos'] = hist_acertos + [acertos_pct]
+    revisao['historico_intervalos'] = hist_intervalos + [novo_intervalo]
+    revisao['historico_datas'] = hist_datas + [data_revisao]
+    revisao['historico_ease_factors'] = hist_efs + [novo_ef]
     
     salvar_dados(dados)
     print(f"\n{C_GREEN}✔ Revisão registrada com sucesso!{C_RESET}")
     print(f"  • Total de revisões concluídas: {revisoes_feitas_nova}")
-    print(f"  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
+    print(f"\n{C_CYAN}📊 DETALHES DO CÁLCULO DE ESPAÇAMENTO INTELIGENTE:{C_RESET}")
+    print(info["detalhes"])
+    print(f"\n  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
     input("\nPressione Enter para continuar...")
 
 def menu_revisoes(dados):
