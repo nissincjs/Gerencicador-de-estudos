@@ -1,0 +1,14 @@
+# Banco de dados / Dados locais do usuário
+ciclo_estudos.json
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Configurações de editores/IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
