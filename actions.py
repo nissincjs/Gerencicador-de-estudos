@@ -113,16 +113,10 @@ def exibir_ciclo(dados, pausar=True):
         else:
             restante_formatada = formatar_horas_minutos(restante_horas)
         
-        # Como w_materia agora é dinâmica para caber a matéria mais longa, não truncamos a menos que passe de w_materia
-        if len(mc["nome"]) > w_materia:
-            nome_trunc = mc["nome"][:w_materia - 2] + ".."
-        else:
-            nome_trunc = mc["nome"]
-        
         restante_exibicao = f"{C_GREEN}{restante_formatada:>{w_restante}}{C_RESET}" if restante_formatada == "Concluído" else f"{restante_formatada:>{w_restante}}"
         
         print(
-            C_CYAN + "│" + C_RESET + f" {nome_trunc:<{w_materia}} " +
+            C_CYAN + "│" + C_RESET + f" {mc['nome']:<{w_materia}} " +
             C_CYAN + "│" + C_RESET + f" {mc['questoes_prova']:>{w_quest}.1f} " +
             C_CYAN + "│" + C_RESET + f" {mc['peso_questao']:>{w_peso}.1f} " +
             C_CYAN + "│" + C_RESET + f" {mc['dificuldade']:>{w_dif}.1f} " +

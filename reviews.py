@@ -80,20 +80,25 @@ def calcular_proxima_revisao(data_base_str, acertos_pct, intervalo_dias_atual=No
 def desenhar_tabela_revisoes(lista_revisoes, titulo):
     """Exibe um cabeçalho e desenha uma tabela estilizada com as revisões fornecidas."""
     clear_screen()
-    print_header(titulo)
     
     if not lista_revisoes:
+        print_header(titulo)
         print(f"\n{C_YELLOW}⚠ Nenhuma revisão pendente ou cadastrada.{C_RESET}")
         return False
         
     w_id = 3
-    w_mat = 13
-    w_ass = 15
+    w_mat = max(13, max(len(r["materia"]) for r in lista_revisoes))
+    w_ass = max(15, max(len(r["assunto"]) for r in lista_revisoes))
     w_data = 10
-    w_pct = 5
+    w_pct = 6
     w_prox = 10
-    w_stat = 11
+    w_stat = 14
     
+    largura_tabela = w_id + w_mat + w_ass + w_data + w_pct + w_prox + w_stat + 22
+    
+    print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
+    print(f"║{C_CYAN}{titulo.center(largura_tabela - 2)}{C_RESET}║")
+    print("╚" + "═" * (largura_tabela - 2) + "╝")
     border_top = C_CYAN + "┌" + "─"*(w_id+2) + "┬" + "─"*(w_mat+2) + "┬" + "─"*(w_ass+2) + "┬" + "─"*(w_data+2) + "┬" + "─"*(w_pct+2) + "┬" + "─"*(w_prox+2) + "┬" + "─"*(w_stat+2) + "┐" + C_RESET
     border_mid = C_CYAN + "├" + "─"*(w_id+2) + "┼" + "─"*(w_mat+2) + "┼" + "─"*(w_ass+2) + "┼" + "─"*(w_data+2) + "┼" + "─"*(w_pct+2) + "┼" + "─"*(w_prox+2) + "┼" + "─"*(w_stat+2) + "┤" + C_RESET
     border_bot = C_CYAN + "└" + "─"*(w_id+2) + "┴" + "─"*(w_mat+2) + "┴" + "─"*(w_ass+2) + "┴" + "─"*(w_data+2) + "┴" + "─"*(w_pct+2) + "┴" + "─"*(w_prox+2) + "┴" + "─"*(w_stat+2) + "┘" + C_RESET
@@ -117,8 +122,8 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
         pct_str = f"{r['acertos_pct']:.1f}%" if r['acertos_pct'] is not None else "N/A"
         status_str, _ = calcular_status_e_dias(r['data_proxima_revisao'])
         
-        mat_trunc = r['materia'][:w_mat-2] + ".." if len(r['materia']) > w_mat else r['materia']
-        ass_trunc = r['assunto'][:w_ass-2] + ".." if len(r['assunto']) > w_ass else r['assunto']
+        mat_exibicao = r['materia']
+        ass_exibicao = r['assunto']
         
         # Corrige o padding considerando que o status_str pode conter caracteres de escape ANSI de cor
         clean_status = re.sub(r'\033\[[0-9;]*m', '', status_str)
@@ -127,8 +132,8 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
         
         print(
             C_CYAN + "│" + C_RESET + f" {r['id']:<{w_id}} " +
-            C_CYAN + "│" + C_RESET + f" {mat_trunc:<{w_mat}} " +
-            C_CYAN + "│" + C_RESET + f" {ass_trunc:<{w_ass}} " +
+            C_CYAN + "│" + C_RESET + f" {mat_exibicao:<{w_mat}} " +
+            C_CYAN + "│" + C_RESET + f" {ass_exibicao:<{w_ass}} " +
             C_CYAN + "│" + C_RESET + f" {r['data_ultimo_estudo']:<{w_data}} " +
             C_CYAN + "│" + C_RESET + f" {pct_str:>{w_pct}} " +
             C_CYAN + "│" + C_RESET + f" {r['data_proxima_revisao']:<{w_prox}} " +
