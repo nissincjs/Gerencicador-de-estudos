@@ -28,6 +28,9 @@ def carregar_dados():
                     dados["historico_ciclos"] = []
                 if "revisoes" not in dados:
                     dados["revisoes"] = []
+                if "limite_revisoes_diarias" not in dados:
+                    dados["limite_revisoes_diarias"] = 10
+                    migrou = True
                 
                 # Migração de dados do formato antigo para o formato estratégico (sem aulas)
                 migrou = False
@@ -74,6 +77,7 @@ def carregar_dados():
             
     return {
         "horas_semanais": 0.0,
+        "limite_revisoes_diarias": 10,
         "data_inicio_ciclo": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         "materias": [],
         "progresso_atual": {},

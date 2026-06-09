@@ -7,7 +7,7 @@ from utils import (
     clear_screen, print_header, print_divider,
     obter_input_float, obter_input_str
 )
-from database import salvar_dados
+from database import salvar_dados, obter_fator
 
 def obter_input_data(prompt, default_hoje=True):
     """Lê uma data no formato DD/MM/YYYY e valida. Se deixada em branco, retorna hoje ou vazio."""
@@ -44,6 +44,99 @@ def calcular_status_e_dias(data_proxima_str):
 def arredondar_dias(dias):
     """Realiza arredondamento matemático padrão (0.5 ou mais arredonda para cima)."""
     return int(dias + 0.5) if dias >= 0 else int(dias - 0.5)
+
+def obter_revisoes_filtradas_e_ordenadas(dados):
+    """
+    Filtra as revisões pendentes para hoje, limitando o total diário e distribuindo
+    de forma proporcional à importância das matérias no ciclo.
+    Retorna a lista final de revisões a serem exibidas hoje.
+    """
+    revisoes = dados.get("revisoes", [])
+    limite_diario = dados.get("limite_revisoes_diarias", 10)
+    
+    hoje = datetime.now().date()
+    
+    # 1. Filtra todas as revisões pendentes (vencidas ou hoje)
+    pendentes_todas = []
+    for r in revisoes:
+        try:
+            dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
+            if dt_rev <= hoje:
+                # Calcula atraso em dias
+                atraso = (hoje - dt_rev).days
+                pendentes_todas.append((r, atraso))
+        except ValueError:
+            pass
+            
+    if not pendentes_todas:
+        return []
+        
+    # Se o limite diário for <= 0, o limite está desativado. Retorna todas ordenadas.
+    if limite_diario <= 0:
+        materias_dict = {m["nome"]: obter_fator(m) for m in dados.get("materias", [])}
+        pendentes_todas.sort(key=lambda x: (materias_dict.get(x[0]["materia"], 0.0), x[1]), reverse=True)
+        return [item[0] for item in pendentes_todas]
+        
+    # Se o total de pendentes for menor ou igual ao limite, exibe todas
+    if len(pendentes_todas) <= limite_diario:
+        materias_dict = {m["nome"]: obter_fator(m) for m in dados.get("materias", [])}
+        pendentes_todas.sort(key=lambda x: (materias_dict.get(x[0]["materia"], 0.0), x[1]), reverse=True)
+        return [item[0] for item in pendentes_todas]
+        
+    # 2. Agrupa pendentes por matéria
+    pendentes_por_materia = {}
+    for r, atraso in pendentes_todas:
+        pendentes_por_materia.setdefault(r["materia"], []).append((r, atraso))
+        
+    # Ordena as revisões de cada matéria por atraso decrescente
+    for mat in pendentes_por_materia:
+        pendentes_por_materia[mat].sort(key=lambda x: x[1], reverse=True)
+        
+    # 3. Calcula fatores de relevância das matérias
+    materias = dados.get("materias", [])
+    fator_total = sum(obter_fator(m) for m in materias)
+    
+    # Se não houver matérias ou fator total for 0, distribui igualmente
+    if fator_total == 0:
+        fator_total = len(materias) if materias else 1
+        materias_pesos = {m["nome"]: 1.0 / fator_total for m in materias}
+    else:
+        materias_pesos = {m["nome"]: obter_fator(m) / fator_total for m in materias}
+        
+    # 4. Seleção inicial por cotas
+    selecionados = []
+    restantes_backlog = []
+    
+    for mat, lista in pendentes_por_materia.items():
+        peso = materias_pesos.get(mat, 0.0)
+        cota = max(1, arredondar_dias(limite_diario * peso))
+        
+        # Seleciona até a cota
+        selecionados_mat = lista[:cota]
+        restantes_mat = lista[cota:]
+        
+        selecionados.extend(selecionados_mat)
+        restantes_backlog.extend(restantes_mat)
+        
+    # Se a seleção de cotas estourar o limite diário (devido a arredondamentos para cima ou mínimos de 1)
+    if len(selecionados) > limite_diario:
+        materias_dict = {m["nome"]: obter_fator(m) for m in materias}
+        selecionados.sort(key=lambda x: (materias_dict.get(x[0]["materia"], 0.0), x[1]), reverse=True)
+        selecionados = selecionados[:limite_diario]
+        return [item[0] for item in selecionados]
+        
+    # Se faltar espaço para atingir o limite diário, preenche com o backlog restante
+    vagas_restantes = limite_diario - len(selecionados)
+    if vagas_restantes > 0 and restantes_backlog:
+        materias_dict = {m["nome"]: obter_fator(m) for m in materias}
+        restantes_backlog.sort(key=lambda x: (materias_dict.get(x[0]["materia"], 0.0), x[1]), reverse=True)
+        selecionados.extend(restantes_backlog[:vagas_restantes])
+        
+    # Ordena a lista final selecionada por relevância e depois por atraso
+    materias_dict = {m["nome"]: obter_fator(m) for m in materias}
+    selecionados.sort(key=lambda x: (materias_dict.get(x[0]["materia"], 0.0), x[1]), reverse=True)
+    
+    return [item[0] for item in selecionados]
 
 def calcular_proxima_revisao(
     data_base_str,
@@ -333,16 +426,12 @@ def ver_revisoes_opcao(dados, apenas_pendentes=False):
     """Exibe a listagem de revisões."""
     revisoes = dados.get("revisoes", [])
     if apenas_pendentes:
-        hoje = datetime.now().date()
-        filtradas = []
-        for r in revisoes:
-            try:
-                dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
-                if dt_rev <= hoje:
-                    filtradas.append(r)
-            except ValueError:
-                pass
-        titulo = "REVISÕES PENDENTES (HOJE E ATRASADAS)"
+        filtradas = obter_revisoes_filtradas_e_ordenadas(dados)
+        limite_diario = dados.get("limite_revisoes_diarias", 10)
+        if limite_diario > 0:
+            titulo = f"REVISÕES PENDENTES DE HOJE (LIMITADO A {limite_diario})"
+        else:
+            titulo = "REVISÕES PENDENTES DE HOJE"
     else:
         filtradas = revisoes
         titulo = "TODAS AS REVISÕES ESTRATÉGICAS"
@@ -536,18 +625,15 @@ def concluir_revisao(dados):
         return
         
     # Agrupa pendentes
-    hoje = datetime.now().date()
-    pendentes = []
-    for r in revisoes:
-        try:
-            dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
-            if dt_rev <= hoje:
-                pendentes.append(r)
-        except ValueError:
-            pass
+    pendentes = obter_revisoes_filtradas_e_ordenadas(dados)
+    limite_diario = dados.get("limite_revisoes_diarias", 10)
             
     if pendentes:
-        desenhar_tabela_revisoes(pendentes, "REVISÕES PENDENTES PARA HOJE")
+        if limite_diario > 0:
+            titulo_tabela = f"REVISÕES PENDENTES PARA HOJE (LIMITADO A {limite_diario})"
+        else:
+            titulo_tabela = "REVISÕES PENDENTES PARA HOJE"
+        desenhar_tabela_revisoes(pendentes, titulo_tabela)
     else:
         print(f"\n{C_GREEN}✔ Nenhuma revisão pendente para hoje!{C_RESET}")
         print("Caso queira adiantar alguma revisão, escolha pelo ID na tabela abaixo:")
@@ -638,6 +724,30 @@ def concluir_revisao(dados):
     print(f"\n  • Próxima revisão agendada: {C_YELLOW}{data_proxima}{C_RESET} (daqui a {novo_intervalo} dias)")
     input("\nPressione Enter para continuar...")
 
+def alterar_limite_revisoes(dados):
+    """Altera o limite diário de revisões pendentes exibidas."""
+    clear_screen()
+    print_header("AJUSTAR LIMITE DIÁRIO DE REVISÕES")
+    
+    limite_atual = dados.get("limite_revisoes_diarias", 10)
+    limite_str = f"{limite_atual} revisões" if limite_atual > 0 else "Sem Limite"
+    print(f"Limite diário atual: {C_GREEN}{limite_str}{C_RESET}\n")
+    
+    print("Digite a quantidade de revisões diárias que deseja ver (limite geral).")
+    print(C_YELLOW + "(Digite 0 para desativar o limite e mostrar todas as pendentes)" + C_RESET)
+    
+    novo_limite = obter_input_float("Novo limite diário: ", min_val=0)
+    
+    dados["limite_revisoes_diarias"] = int(novo_limite)
+    salvar_dados(dados)
+    
+    if int(novo_limite) == 0:
+        print(f"\n{C_GREEN}✔ Limite diário desativado (todas as pendentes serão exibidas)!{C_RESET}")
+    else:
+        print(f"\n{C_GREEN}✔ Limite diário de revisões atualizado para {int(novo_limite)}!{C_RESET}")
+        
+    input("\nPressione Enter para continuar...")
+
 def menu_revisoes(dados):
     """Submenu de controle de revisões estratégicas."""
     while True:
@@ -645,18 +755,30 @@ def menu_revisoes(dados):
         print_header("REVISÕES ESTRATÉGICAS (REPETIÇÃO ESPAÇADA)")
         
         hoje = datetime.now().date()
-        pendentes_qtd = 0
+        pendentes_totais_qtd = 0
         for r in dados.get("revisoes", []):
             try:
                 dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
                 if dt_rev <= hoje:
-                    pendentes_qtd += 1
+                    pendentes_totais_qtd += 1
             except ValueError:
                 pass
                 
         revisoes_totais = len(dados.get("revisoes", []))
         
-        print(f"  {C_BOLD}Pendentes para Hoje:{C_RESET} {C_YELLOW if pendentes_qtd > 0 else C_GREEN}{pendentes_qtd}{C_RESET}   |   {C_BOLD}Total Cadastrado:{C_RESET} {C_GREEN}{revisoes_totais}{C_RESET}")
+        # Obtém a lista limitada
+        pendentes_limitados = obter_revisoes_filtradas_e_ordenadas(dados)
+        pendentes_lim_qtd = len(pendentes_limitados)
+        
+        limite_diario = dados.get("limite_revisoes_diarias", 10)
+        limite_str = f"{limite_diario}" if limite_diario > 0 else "Sem Limite"
+        
+        if limite_diario > 0 and pendentes_totais_qtd > limite_diario:
+            pendentes_exibicao = f"{C_YELLOW}{pendentes_lim_qtd} (Total: {pendentes_totais_qtd}){C_RESET}"
+        else:
+            pendentes_exibicao = f"{C_GREEN if pendentes_lim_qtd == 0 else C_YELLOW}{pendentes_lim_qtd}{C_RESET}"
+        
+        print(f"  {C_BOLD}Pendentes para Hoje:{C_RESET} {pendentes_exibicao}   |   {C_BOLD}Total Cadastrado:{C_RESET} {C_GREEN}{revisoes_totais}{C_RESET}   |   {C_BOLD}Limite Diário:{C_RESET} {C_GREEN}{limite_str}{C_RESET}")
         print_divider()
         
         print(f"  [{C_CYAN}1{C_RESET}] 📋 Ver Revisões Pendentes para Hoje")
@@ -665,6 +787,7 @@ def menu_revisoes(dados):
         print(f"  [{C_CYAN}4{C_RESET}] ✏️  Editar Revisão Existente")
         print(f"  [{C_CYAN}5{C_RESET}] ❌ Remover Revisão")
         print(f"  [{C_CYAN}6{C_RESET}] ✅ Marcar Revisão como Concluída (Estudar)")
+        print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Limite Diário de Revisões")
         print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
         print_divider()
         
@@ -682,8 +805,10 @@ def menu_revisoes(dados):
             remover_revisao(dados)
         elif opcao == "6":
             concluir_revisao(dados)
+        elif opcao == "7":
+            alterar_limite_revisoes(dados)
         elif opcao == "0":
             break
         else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 6.{C_RESET}")
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 7.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
