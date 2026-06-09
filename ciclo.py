@@ -10,6 +10,7 @@ from actions import (
     alterar_horas, registrar_progresso, ajustar_progresso, exibir_historico,
     configuracao_inicial
 )
+from reviews import menu_revisoes
 
 def main():
     dados = carregar_dados()
@@ -37,6 +38,7 @@ def main():
         print(f"  [{C_CYAN}6{C_RESET}] 📝 Registrar Progresso de Estudos")
         print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
         print(f"  [{C_CYAN}8{C_RESET}] 📜 Ver Histórico de Ciclos Completados")
+        print(f"  [{C_CYAN}9{C_RESET}] 🔄 Gerenciar Revisões Estratégicas")
         print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
         print_divider()
         
@@ -58,6 +60,8 @@ def main():
             ajustar_progresso(dados)
         elif opcao == "8":
             exibir_historico(dados)
+        elif opcao == "9":
+            menu_revisoes(dados)
         elif opcao == "0":
             clear_screen()
             print_header("ATÉ LOGO!")
@@ -65,7 +69,7 @@ def main():
             print("Mantenha o foco e bons estudos! 📚🚀\n")
             break
         else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 8.{C_RESET}")
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 9.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
 if __name__ == "__main__":

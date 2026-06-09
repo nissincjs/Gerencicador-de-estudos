@@ -26,6 +26,8 @@ def carregar_dados():
                     dados["progresso_atual"] = {}
                 if "historico_ciclos" not in dados:
                     dados["historico_ciclos"] = []
+                if "revisoes" not in dados:
+                    dados["revisoes"] = []
                 
                 # Migração de dados do formato antigo para o formato estratégico (sem aulas)
                 migrou = False
@@ -58,7 +60,8 @@ def carregar_dados():
         "data_inicio_ciclo": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         "materias": [],
         "progresso_atual": {},
-        "historico_ciclos": []
+        "historico_ciclos": [],
+        "revisoes": []
     }
 
 def salvar_dados(dados):
