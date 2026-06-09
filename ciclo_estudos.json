@@ -2,27 +2,21 @@
   "horas_semanais": 21.0,
   "materias": [
     {
+      "nome": "Tecnologia da Informação",
+      "questoes_prova": 35.0,
+      "peso_questao": 1.5,
+      "dificuldade": 5.0
+    },
+    {
       "nome": "Língua Portuguesa",
       "questoes_prova": 10.0,
       "peso_questao": 1.5,
       "dificuldade": 5.0
     },
     {
-      "nome": "Língua Inglesa",
-      "questoes_prova": 5.0,
-      "peso_questao": 1.0,
-      "dificuldade": 5.0
-    },
-    {
       "nome": "Matemática",
       "questoes_prova": 5.0,
       "peso_questao": 1.5,
-      "dificuldade": 5.0
-    },
-    {
-      "nome": "Atualidades do Mercado Financeiro",
-      "questoes_prova": 5.0,
-      "peso_questao": 1.0,
       "dificuldade": 5.0
     },
     {
@@ -38,9 +32,15 @@
       "dificuldade": 5.0
     },
     {
-      "nome": "Tecnologia da Informação",
-      "questoes_prova": 35.0,
-      "peso_questao": 1.5,
+      "nome": "Língua Inglesa",
+      "questoes_prova": 5.0,
+      "peso_questao": 1.0,
+      "dificuldade": 5.0
+    },
+    {
+      "nome": "Atualidades do Mercado Financeiro",
+      "questoes_prova": 5.0,
+      "peso_questao": 1.0,
       "dificuldade": 5.0
     }
   ],

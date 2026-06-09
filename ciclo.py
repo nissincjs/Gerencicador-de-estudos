@@ -55,6 +55,13 @@ def mostrar_guia_dificuldade():
     print("│" + "   5 - Sem base ou assunto novo (<45% de acertos)".ljust(inner_width) + "│")
     print("└" + "─" * inner_width + "┘" + C_RESET)
 
+def obter_fator(m):
+    """Calcula o fator de prioridade da matéria."""
+    qp = m.get("questoes_prova", 10.0)
+    pq = m.get("peso_questao", 1.0)
+    dif = m.get("dificuldade", 1.0)
+    return qp * pq * dif
+
 def carregar_dados():
     """Carrega os dados salvos do ciclo de estudos e realiza migrações de dados se necessário."""
     if os.path.exists(DB_FILE):
@@ -91,6 +98,8 @@ def carregar_dados():
                 if migrou:
                     salvar_dados(dados)
                     
+                if "materias" in dados:
+                    dados["materias"].sort(key=obter_fator, reverse=True)
                 return dados
         except Exception as e:
             print(f"{C_RED}Erro ao ler o arquivo {DB_FILE}: {e}{C_RESET}")
@@ -107,6 +116,8 @@ def carregar_dados():
 def salvar_dados(dados):
     """Salva os dados do ciclo de estudos em formato JSON."""
     try:
+        if "materias" in dados:
+            dados["materias"].sort(key=obter_fator, reverse=True)
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(dados, f, ensure_ascii=False, indent=2)
     except Exception as e:
