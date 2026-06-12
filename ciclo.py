@@ -6,8 +6,7 @@ from utils import (
 )
 from database import carregar_dados
 from actions import (
-    exibir_ciclo, adicionar_materia, editar_materia, remover_materia,
-    alterar_horas, registrar_progresso, ajustar_progresso, exibir_historico,
+    menu_ciclo_progresso, menu_materias, exibir_historico,
     configuracao_inicial
 )
 from reviews import menu_revisoes
@@ -30,38 +29,23 @@ def main():
         print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{horas}h{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{total_estudado:.1f}h{C_RESET}   |   {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
         print_divider()
         
-        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")
-        print(f"  [{C_CYAN}2{C_RESET}] ➕ Adicionar Nova Matéria")
-        print(f"  [{C_CYAN}3{C_RESET}] ✏️  Editar Matéria Existente")
-        print(f"  [{C_CYAN}4{C_RESET}] ❌ Remover Matéria")
-        print(f"  [{C_CYAN}5{C_RESET}] ⏱️  Alterar Horas Semanais")
-        print(f"  [{C_CYAN}6{C_RESET}] 📝 Registrar Progresso de Estudos")
-        print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
-        print(f"  [{C_CYAN}8{C_RESET}] 📜 Ver Históricos de Estudos (Ciclos e Sessões)")
-        print(f"  [{C_CYAN}9{C_RESET}] 🔄 Gerenciar Revisões Estratégicas")
+        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
+        print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
+        print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
+        print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
         print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
         print_divider()
         
         opcao = input("Escolha uma opção: ").strip()
         
         if opcao == "1":
-            exibir_ciclo(dados, pausar=True)
+            menu_ciclo_progresso(dados)
         elif opcao == "2":
-            adicionar_materia(dados)
+            menu_materias(dados)
         elif opcao == "3":
-            editar_materia(dados)
-        elif opcao == "4":
-            remover_materia(dados)
-        elif opcao == "5":
-            alterar_horas(dados)
-        elif opcao == "6":
-            registrar_progresso(dados)
-        elif opcao == "7":
-            ajustar_progresso(dados)
-        elif opcao == "8":
-            exibir_historico(dados)
-        elif opcao == "9":
             menu_revisoes(dados)
+        elif opcao == "4":
+            exibir_historico(dados)
         elif opcao == "0":
             clear_screen()
             print_header("ATÉ LOGO!")
@@ -69,7 +53,7 @@ def main():
             print("Mantenha o foco e bons estudos! 📚🚀\n")
             break
         else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 9.{C_RESET}")
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
 if __name__ == "__main__":

@@ -653,3 +653,65 @@ def configuracao_inicial(dados):
     salvar_dados(dados)
     print(f"\n{C_GREEN}✔ Configuração inicial concluída com sucesso!{C_RESET}")
     input("\nPressione Enter para acessar o Menu Principal...")
+
+def menu_ciclo_progresso(dados):
+    """Submenu para gerenciar o ciclo de estudos e progresso."""
+    while True:
+        clear_screen()
+        print_header("CICLO DE ESTUDOS & PROGRESSO")
+        
+        horas = dados.get("horas_semanais", 0.0)
+        total_estudado = sum(dados.get("progresso_atual", {}).values())
+        print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{horas}h{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{total_estudado:.1f}h{C_RESET}")
+        print_divider()
+        
+        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")
+        print(f"  [{C_CYAN}2{C_RESET}] 📝 Registrar Progresso de Estudos")
+        print(f"  [{C_CYAN}3{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
+        print(f"  [{C_CYAN}4{C_RESET}] ⏱️  Alterar Horas Semanais")
+        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+        print_divider()
+        
+        opcao = input("Escolha uma opção: ").strip()
+        if opcao == "1":
+            exibir_ciclo(dados, pausar=True)
+        elif opcao == "2":
+            registrar_progresso(dados)
+        elif opcao == "3":
+            ajustar_progresso(dados)
+        elif opcao == "4":
+            alterar_horas(dados)
+        elif opcao == "0":
+            break
+        else:
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+
+def menu_materias(dados):
+    """Submenu para gerenciamento de matérias."""
+    while True:
+        clear_screen()
+        print_header("GERENCIAR MATÉRIAS")
+        
+        num_materias = len(dados.get("materias", []))
+        print(f"  {C_BOLD}Matérias Cadastradas:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
+        print_divider()
+        
+        print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Nova Matéria")
+        print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Matéria Existente")
+        print(f"  [{C_CYAN}3{C_RESET}] ❌ Remover Matéria")
+        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+        print_divider()
+        
+        opcao = input("Escolha uma opção: ").strip()
+        if opcao == "1":
+            adicionar_materia(dados)
+        elif opcao == "2":
+            editar_materia(dados)
+        elif opcao == "3":
+            remover_materia(dados)
+        elif opcao == "0":
+            break
+        else:
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 3.{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
