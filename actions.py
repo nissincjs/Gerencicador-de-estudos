@@ -715,3 +715,81 @@ def menu_materias(dados):
         else:
             print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 3.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
+
+def verificar_atualizacao(dados):
+    """Verifica se há atualizações do script no GitHub e atualiza via git pull."""
+    import urllib.request
+    import subprocess
+    import sys
+    import os
+
+    clear_screen()
+    print_header("VERIFICAR ATUALIZAÇÕES")
+
+    # 1. Obter versão local
+    versao_local = "1.0.0"
+    if os.path.exists("version.txt"):
+        try:
+            with open("version.txt", "r", encoding="utf-8") as f:
+                versao_local = f.read().strip()
+        except Exception as e:
+            print(f"{C_RED}Erro ao ler versão local:{C_RESET} {e}")
+            
+    print(f"Versão local: {C_GREEN}{versao_local}{C_RESET}")
+    print("Verificando versão no GitHub...")
+
+    # 2. Obter versão remota
+    url_remota = "https://raw.githubusercontent.com/nissincjs/Gerencicador-de-estudos/main/version.txt"
+    try:
+        req = urllib.request.Request(url_remota, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            versao_remota = response.read().decode('utf-8').strip()
+    except Exception as e:
+        print(f"\n{C_RED}Não foi possível conectar ao GitHub para verificar atualizações.{C_RESET}")
+        print(f"Erro: {e}")
+        input("\nPressione Enter para voltar ao menu...")
+        return
+
+    # 3. Comparar versões
+    if versao_local == versao_remota:
+        print(f"\n{C_GREEN}✔ Você já possui a versão mais recente ({versao_local})!{C_RESET}")
+        input("\nPressione Enter para retornar...")
+        return
+
+    # Se a versão for diferente
+    print(f"\n{C_YELLOW}⚠ Uma nova versão está disponível!{C_RESET}")
+    print(f"  • Versão Local:  {C_RED}{versao_local}{C_RESET}")
+    print(f"  • Versão Remota: {C_GREEN}{versao_remota}{C_RESET}")
+    print_divider()
+    
+    opcao = obter_input_str("Deseja atualizar o script agora? (S/N): ").strip().upper()
+    if opcao == "S":
+        print(f"\n{C_CYAN}Executando atualização via 'git pull'...{C_RESET}\n")
+        try:
+            # Tenta executar o git pull
+            resultado = subprocess.run(["git", "pull"], capture_output=True, text=True, check=True)
+            print(f"{C_GREEN}✔ Atualização via git concluída com sucesso!{C_RESET}")
+            if resultado.stdout:
+                print(f"{C_CYAN}Saída do Git:{C_RESET}\n{resultado.stdout}")
+            
+            print(f"\n{C_YELLOW}A aplicação será encerrada para aplicar as atualizações. Por favor, inicie o script novamente.{C_RESET}")
+            input("\nPressione Enter para fechar...")
+            sys.exit(0)
+        except subprocess.CalledProcessError as e:
+            print(f"{C_RED}Erro ao executar 'git pull':{C_RESET}")
+            if e.stderr:
+                print(e.stderr)
+            else:
+                print(e)
+            print(f"\n{C_YELLOW}Tente rodar 'git pull' manualmente no seu terminal.{C_RESET}")
+            input("\nPressione Enter para retornar...")
+        except FileNotFoundError:
+            print(f"{C_RED}Erro: O comando 'git' não foi encontrado no seu sistema.{C_RESET}")
+            print(f"Por favor, instale o Git ou atualize os arquivos manualmente baixando do repositório.")
+            input("\nPressione Enter para retornar...")
+        except Exception as e:
+            print(f"{C_RED}Erro inesperado ao atualizar:{C_RESET} {e}")
+            input("\nPressione Enter para retornar...")
+    else:
+        print(f"\n{C_YELLOW}Atualização cancelada.{C_RESET}")
+        input("\nPressione Enter para retornar...")

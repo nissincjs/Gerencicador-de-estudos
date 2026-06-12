@@ -7,7 +7,7 @@ from utils import (
 from database import carregar_dados
 from actions import (
     menu_ciclo_progresso, menu_materias, exibir_historico,
-    configuracao_inicial
+    configuracao_inicial, verificar_atualizacao
 )
 from reviews import menu_revisoes
 
@@ -33,6 +33,7 @@ def main():
         print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
         print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
         print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
+        print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
         print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
         print_divider()
         
@@ -46,6 +47,8 @@ def main():
             menu_revisoes(dados)
         elif opcao == "4":
             exibir_historico(dados)
+        elif opcao == "5":
+            verificar_atualizacao(dados)
         elif opcao == "0":
             clear_screen()
             print_header("ATÉ LOGO!")
@@ -53,7 +56,7 @@ def main():
             print("Mantenha o foco e bons estudos! 📚🚀\n")
             break
         else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 5.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
 if __name__ == "__main__":
