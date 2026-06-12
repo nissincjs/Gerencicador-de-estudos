@@ -30,11 +30,13 @@
 
 O projeto utiliza um design de terminal premium com cores ANSI vibrantes e formatação tabular precisa, desenhado para ser legível, dinâmico e esteticamente agradável:
 
-* **Ciano (`\033[96m`)**: Estruturas de tabelas, cabeçalhos de menus e realces.
-* **Verde (`\033[92m`)**: Valores positivos, conclusões de metas, tempo estudado e status de sucesso.
-* **Amarelo (`\033[93m`)**: Avisos importantes, observações e lembretes de revisões.
-* **Vermelho (`\033[91m`)**: Erros de validação, status atrasados e alertas críticos.
-* **Negrito (`\033[1m`)**: Rótulos e informações principais.
+| Cor | Código ANSI | Descrição / Uso |
+| :--- | :---: | :--- |
+| 🔵 **Ciano** | `\033[96m` | Estruturas de tabelas, cabeçalhos de menus e realces. |
+| 🟢 **Verde** | `\033[92m` | Valores positivos, conclusões de metas, tempo estudado e status de sucesso. |
+| 🟡 **Amarelo** | `\033[93m` | Avisos importantes, observações e lembretes de revisões. |
+| 🔴 **Vermelho** | `\033[91m` | Erros de validação, status atrasados e alertas críticos. |
+| ⚪ **Negrito** | `\033[1m` | Rótulos e informações principais do console. |
 
 ---
 
