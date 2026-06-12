@@ -37,7 +37,7 @@ def main():
         print(f"  [{C_CYAN}5{C_RESET}] ⏱️  Alterar Horas Semanais")
         print(f"  [{C_CYAN}6{C_RESET}] 📝 Registrar Progresso de Estudos")
         print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
-        print(f"  [{C_CYAN}8{C_RESET}] 📜 Ver Histórico de Ciclos Completados")
+        print(f"  [{C_CYAN}8{C_RESET}] 📜 Ver Históricos de Estudos (Ciclos e Sessões)")
         print(f"  [{C_CYAN}9{C_RESET}] 🔄 Gerenciar Revisões Estratégicas")
         print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
         print_divider()

@@ -218,10 +218,14 @@ def editar_materia(dados):
     mostrar_guia_dificuldade()
     dificuldade = obter_input_float(f"Dificuldade (1 a 5) [{materia['dificuldade']}]: ", min_val=1.0, max_val=5.0, default=materia['dificuldade'])
     
-    # Se mudar o nome da matéria, também precisamos ajustar o progresso_atual
+    # Se mudar o nome da matéria, também precisamos ajustar o progresso_atual e o histórico de sessões
     velho_nome = materia['nome']
-    if novo_nome != velho_nome and velho_nome in dados.get("progresso_atual", {}):
-        dados["progresso_atual"][novo_nome] = dados["progresso_atual"].pop(velho_nome)
+    if novo_nome != velho_nome:
+        if velho_nome in dados.get("progresso_atual", {}):
+            dados["progresso_atual"][novo_nome] = dados["progresso_atual"].pop(velho_nome)
+        for s in dados.get("historico_sessoes", []):
+            if s.get("materia") == velho_nome:
+                s["materia"] = novo_nome
 
     materia['nome'] = novo_nome
     materia['questoes_prova'] = questoes_prova
@@ -391,6 +395,20 @@ def registrar_progresso(dados):
     # Atualiza o progresso
     progresso = dados.setdefault("progresso_atual", {})
     progresso[materia_nome] = progresso.get(materia_nome, 0.0) + horas_estudadas
+    
+    print(f"\n{C_YELLOW}(Opcional) Digite uma observação/anotação sobre o que estudou:{C_RESET}")
+    obs = obter_input_str("Observação: ", obrigatorio=False)
+    
+    # Salva no histórico de sessões
+    sessoes = dados.setdefault("historico_sessoes", [])
+    sessoes.append({
+        "materia": materia_nome,
+        "horas": horas_estudadas,
+        "data": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "tipo": "registro",
+        "obs": obs
+    })
+    
     salvar_dados(dados)
     
     tempo_formatado = formatar_horas_minutos(horas_estudadas)
@@ -451,6 +469,17 @@ def ajustar_progresso(dados):
             print(f"{C_RED}Erro de formato: {e}. Tente novamente.{C_RESET}")
             
     progresso[materia_nome] = novas_horas
+    
+    # Salva no histórico de sessões
+    sessoes = dados.setdefault("historico_sessoes", [])
+    sessoes.append({
+        "materia": materia_nome,
+        "horas": novas_horas,
+        "data": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "tipo": "ajuste",
+        "obs": f"Ajuste de progresso acumulado (anterior: {tempo_atual_formatado})"
+    })
+    
     salvar_dados(dados)
     
     tempo_novo_formatado = formatar_horas_minutos(novas_horas)
@@ -460,7 +489,7 @@ def ajustar_progresso(dados):
     verificar_conclusao_ciclo(dados)
     input("\nPressione Enter para continuar...")
 
-def exibir_historico(dados):
+def exibir_historico_ciclos(dados):
     """Exibe a listagem de ciclos de estudos passados completados."""
     clear_screen()
     print_header("HISTÓRICO DE CICLOS CONCLUÍDOS")
@@ -483,7 +512,117 @@ def exibir_historico(dados):
             print(f"    • {mat['nome']}: {est_f} estudados (Meta: {meta_f})")
         print_divider()
         
-    input("Pressione Enter para voltar ao menu...")
+    input("\nPressione Enter para voltar...")
+
+def exibir_historico_sessoes(dados):
+    """Exibe o histórico detalhado de sessões de estudo (logs de progressos)."""
+    materia_filtro = None
+    
+    while True:
+        clear_screen()
+        sessoes = dados.get("historico_sessoes", [])
+        
+        titulo = "HISTÓRICO DETALHADO DE SESSÕES (LOGS)"
+        if materia_filtro:
+            titulo += f" - {materia_filtro.upper()}"
+        print_header(titulo)
+        
+        # Filtra sessões se houver filtro ativo
+        sessoes_filtradas = sessoes
+        if materia_filtro:
+            sessoes_filtradas = [s for s in sessoes if s.get("materia", "").lower() == materia_filtro.lower()]
+            
+        if not sessoes_filtradas:
+            print(f"\n{C_YELLOW}⚠ Nenhuma sessão de estudo registrada.{C_RESET}")
+            if materia_filtro:
+                print(f"Nenhum registro encontrado para a matéria '{materia_filtro}'.")
+        else:
+            # Mostra as mais recentes primeiro
+            for s in reversed(sessoes_filtradas):
+                data_hora = s.get("data", "N/A")
+                materia = s.get("materia", "N/A")
+                horas = s.get("horas", 0.0)
+                tipo = s.get("tipo", "registro")
+                obs = s.get("obs", "")
+                
+                tempo_f = formatar_horas_minutos(horas)
+                
+                if tipo == "ajuste":
+                    msg = f"Ajustou o progresso acumulado para {C_GREEN}{tempo_f}{C_RESET}."
+                else:
+                    msg = f"Estudou por {C_GREEN}{tempo_f}{C_RESET}."
+                
+                print(f"  📅 {C_BOLD}{data_hora}{C_RESET}")
+                print(f"  📚 Matéria: {C_CYAN}{materia}{C_RESET}")
+                print(f"  💬 Ação:    {msg}")
+                if obs:
+                    print(f"  📝 Obs:     {C_YELLOW}{obs}{C_RESET}")
+                print_divider()
+                
+        print(f"  [{C_CYAN}F{C_RESET}] Filtrar por Matéria")
+        if materia_filtro:
+            print(f"  [{C_CYAN}T{C_RESET}] Remover Filtro (Mostrar Todas)")
+        print(f"  [{C_CYAN}L{C_RESET}] Limpar Histórico de Sessões")
+        print(f"  [{C_CYAN}0{C_RESET}] Voltar ao Menu de Históricos")
+        print_divider()
+        
+        opcao = input("Escolha uma opção (ou Enter para voltar): ").strip().upper()
+        if not opcao or opcao == "0":
+            break
+        elif opcao == "F":
+            materias = dados.get("materias", [])
+            if not materias:
+                print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada para filtrar.{C_RESET}")
+                input("\nPressione Enter para continuar...")
+                continue
+                
+            clear_screen()
+            print_header("FILTRAR POR MATÉRIA")
+            for i, m in enumerate(materias, start=1):
+                print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']}")
+            print_divider()
+            opcao_m = obter_input_float("Escolha o número da matéria (ou 0 para cancelar): ", min_val=0, max_val=len(materias))
+            if opcao_m > 0:
+                materia_filtro = materias[int(opcao_m) - 1]["nome"]
+        elif opcao == "T":
+            materia_filtro = None
+        elif opcao == "L":
+            confirmar = obter_input_str("Deseja realmente apagar TODO o histórico de sessões? (S/N): ").upper()
+            if confirmar == "S":
+                confirmar2 = obter_input_str("Digite 'CONFIRMAR' para prosseguir com a exclusão definitiva: ").upper()
+                if confirmar2 == "CONFIRMAR":
+                    dados["historico_sessoes"] = []
+                    salvar_dados(dados)
+                    print(f"\n{C_GREEN}✔ Histórico de sessões apagado com sucesso!{C_RESET}")
+                    input("\nPressione Enter para continuar...")
+                else:
+                    print(f"\n{C_YELLOW}Ação cancelada (confirmação inválida).{C_RESET}")
+                    input("\nPressione Enter para continuar...")
+            else:
+                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+                input("\nPressione Enter para continuar...")
+
+def exibir_historico(dados):
+    """Submenu para exibir históricos do ciclo e sessões de estudo."""
+    while True:
+        clear_screen()
+        print_header("HISTÓRICOS DE ESTUDOS")
+        
+        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Histórico de Ciclos Completados")
+        print(f"  [{C_CYAN}2{C_RESET}] 📝 Ver Histórico Detalhado de Sessões (Logs)")
+        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+        print_divider()
+        
+        opcao = input("Escolha uma opção: ").strip()
+        if opcao == "1":
+            exibir_historico_ciclos(dados)
+        elif opcao == "2":
+            exibir_historico_sessoes(dados)
+        elif opcao == "0":
+            break
+        else:
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 2.{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
 
 def configuracao_inicial(dados):
     """Guia o usuário na primeira configuração estratégica de estudos."""

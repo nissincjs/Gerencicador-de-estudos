@@ -26,6 +26,9 @@ def carregar_dados():
                     dados["progresso_atual"] = {}
                 if "historico_ciclos" not in dados:
                     dados["historico_ciclos"] = []
+                if "historico_sessoes" not in dados:
+                    dados["historico_sessoes"] = []
+                    migrou = True
                 if "revisoes" not in dados:
                     dados["revisoes"] = []
                 if "limite_revisoes_diarias" not in dados:
@@ -82,6 +85,7 @@ def carregar_dados():
         "materias": [],
         "progresso_atual": {},
         "historico_ciclos": [],
+        "historico_sessoes": [],
         "revisoes": []
     }
 
