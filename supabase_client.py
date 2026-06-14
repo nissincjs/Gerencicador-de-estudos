@@ -147,4 +147,123 @@ def baixar_dados_nuvem() -> dict:
         pass
     return None
 
+def garantir_perfil_criado(user_id: str, email: str):
+    """Garante que o perfil do usuário exista na tabela perfis_usuario, criando-o se necessário."""
+    if not esta_configurado():
+        return
+    try:
+        res = supabase.table("perfis_usuario").select("*").eq("user_id", user_id).execute()
+        if not res.data:
+            import random
+            import string
+            
+            tentativas = 0
+            while tentativas < 10:
+                code_suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                codigo = f"ST-{code_suffix}"
+                
+                check_res = supabase.table("perfis_usuario").select("codigo_convite").eq("codigo_convite", codigo).execute()
+                if not check_res.data:
+                    supabase.table("perfis_usuario").insert({
+                        "user_id": user_id,
+                        "email": email,
+                        "codigo_convite": codigo
+                    }).execute()
+                    break
+                tentativas += 1
+    except Exception:
+        pass
+
+def obter_perfil() -> dict:
+    """Retorna o perfil do usuário logado na tabela perfis_usuario."""
+    if not esta_configurado():
+        return None
+    user_id = obter_id_usuario()
+    if not user_id:
+        return None
+    try:
+        res = supabase.table("perfis_usuario").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            return res.data[0]
+    except Exception:
+        pass
+    return None
+
+def vincular_parceiro(codigo_convite: str):
+    """Vincula um parceiro de estudos utilizando o código de convite."""
+    if not esta_configurado():
+        raise Exception("Supabase não configurado.")
+    
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        raise Exception("Usuário não autenticado.")
+        
+    # Busca o perfil alvo
+    res = supabase.table("perfis_usuario").select("*").eq("codigo_convite", codigo_convite.strip().upper()).execute()
+    if not res.data:
+        raise Exception("Código de convite inválido ou não encontrado.")
+        
+    alvo = res.data[0]
+    alvo_user_id = alvo["user_id"]
+    
+    if alvo_user_id == current_user_id:
+        raise Exception("Você não pode vincular seu próprio código!")
+        
+    if alvo.get("parceiro_id"):
+        raise Exception("Este usuário já possui um parceiro de estudos.")
+        
+    # Busca perfil atual
+    res_atual = supabase.table("perfis_usuario").select("*").eq("user_id", current_user_id).execute()
+    if res_atual.data and res_atual.data[0].get("parceiro_id"):
+        raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
+        
+    # Vincula mutuamente
+    try:
+        supabase.table("perfis_usuario").update({"parceiro_id": alvo_user_id}).eq("user_id", current_user_id).execute()
+        supabase.table("perfis_usuario").update({"parceiro_id": current_user_id}).eq("user_id", alvo_user_id).execute()
+    except Exception as e:
+        raise Exception(f"Erro ao salvar vínculo: {e}")
+
+def desvincular_parceiro():
+    """Remove o vínculo mútuo entre o usuário atual e seu parceiro."""
+    if not esta_configurado():
+        return
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        return
+    try:
+        perfil = obter_perfil()
+        if perfil and perfil.get("parceiro_id"):
+            parceiro_id = perfil["parceiro_id"]
+            # Desvincula ambos
+            supabase.table("perfis_usuario").update({"parceiro_id": None}).eq("user_id", current_user_id).execute()
+            supabase.table("perfis_usuario").update({"parceiro_id": None}).eq("user_id", parceiro_id).execute()
+    except Exception:
+        pass
+
+def obter_perfil_por_id(user_id: str) -> dict:
+    """Busca um perfil específico pelo user_id."""
+    if not esta_configurado() or not user_id:
+        return None
+    try:
+        res = supabase.table("perfis_usuario").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            return res.data[0]
+    except Exception:
+        pass
+    return None
+
+def baixar_dados_parceiro(parceiro_id: str) -> dict:
+    """Busca dados de progresso do parceiro de estudos."""
+    if not esta_configurado() or not parceiro_id:
+        return None
+    try:
+        response = supabase.table("ciclos_usuario").select("dados").eq("user_id", parceiro_id).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0].get("dados")
+    except Exception:
+        pass
+    return None
+
+
 

@@ -34,6 +34,9 @@ def carregar_dados():
                 if "limite_revisoes_diarias" not in dados:
                     dados["limite_revisoes_diarias"] = 10
                     migrou = True
+                if "justificativas" not in dados:
+                    dados["justificativas"] = []
+                    migrou = True
                 
                 # Migração de dados do formato antigo para o formato estratégico (sem aulas)
                 migrou = False
@@ -86,7 +89,8 @@ def carregar_dados():
         "progresso_atual": {},
         "historico_ciclos": [],
         "historico_sessoes": [],
-        "revisoes": []
+        "revisoes": [],
+        "justificativas": []
     }
 
 def salvar_local(dados):

@@ -13,6 +13,7 @@ from actions import (
 )
 from reviews import menu_revisoes
 import os
+import partner_menu
 
 def main():
     # Verifica se o Supabase está devidamente configurado
@@ -90,6 +91,10 @@ def main():
             print(f"\n{C_RED}Opção inválida!{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
+    # Garante que o perfil do usuário esteja criado no banco
+    if usuario:
+        supabase_client.garantir_perfil_criado(usuario.id, usuario.email)
+
     # Fluxo de Sincronização Local + Nuvem
     dados_nuvem = supabase_client.baixar_dados_nuvem()
     local_exists = os.path.exists(DB_FILE)
@@ -154,6 +159,7 @@ def main():
         print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
         print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
         print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
+        print(f"  [{C_CYAN}6{C_RESET}] 🤝 Parceiro de Estudos")
         print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar / Alternar Conta")
         print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
         print_divider()
@@ -170,6 +176,8 @@ def main():
             exibir_historico(dados)
         elif opcao == "5":
             verificar_atualizacao(dados)
+        elif opcao == "6":
+            partner_menu.menu_parceria(dados)
         elif opcao == "9":
             clear_screen()
             print_header("DESCONECTANDO")
@@ -184,7 +192,7 @@ def main():
             print("Mantenha o foco e bons estudos! 📚🚀\n")
             break
         else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-5 ou 9.{C_RESET}")
+            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-6 ou 9.{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
 if __name__ == "__main__":
