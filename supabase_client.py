@@ -220,7 +220,7 @@ def vincular_parceiro(codigo_convite: str):
         if perfil_atual.get("parceiro_id"):
             raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
             
-    if alvo.get("parceiro_id"):
+    if alvo.get("parceiro_id") and alvo.get("parceiro_id") != current_user_id:
         raise Exception("Este usuário já possui um parceiro de estudos.")
         
     # Vincula mutuamente
