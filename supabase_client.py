@@ -214,9 +214,9 @@ def vincular_parceiro(codigo_convite: str):
     
     if res_atual.data:
         perfil_atual = res_atual.data[0]
-        # Se já estiverem mutuamente vinculados kkk
+        # Se o parceiro já me vinculou, já estamos vinculados mutuamente no banco. Retorna com sucesso kkk
         if perfil_atual.get("parceiro_id") == alvo_user_id:
-            raise Exception("Vocês já estão vinculados! Volte ao menu anterior para atualizar a tela.")
+            return
         if perfil_atual.get("parceiro_id"):
             raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
             
