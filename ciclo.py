@@ -15,6 +15,23 @@ from reviews import menu_revisoes
 import os
 import partner_menu
 
+def limpar_meta_dados(dados: dict) -> dict:
+    """Retorna uma cópia limpa dos dados sem campos de controle/timestamp."""
+    if not dados:
+        return {}
+    copia = dados.copy()
+    copia.pop("sync_pending", None)
+    copia.pop("updated_at", None)
+    return copia
+
+def e_vazio(dados: dict) -> bool:
+    """Verifica se o ciclo de estudos está vazio/zerado (sem horas e sem matérias)."""
+    if not dados:
+        return True
+    materias = dados.get("materias", [])
+    horas = dados.get("horas_semanais", 0.0)
+    return len(materias) == 0 and horas == 0.0
+
 def main():
     # Verifica se o Supabase está devidamente configurado
     if not supabase_client.esta_configurado():
@@ -106,33 +123,88 @@ def main():
             print_header("RESTAURAÇÃO DE DADOS DA NUVEM")
             print(f"\n{C_GREEN}Dados salvos encontrados no Supabase! Recriando ciclo local...{C_RESET}")
             dados = dados_nuvem
+            dados["sync_pending"] = False
             salvar_local(dados)
             input("\nPressione Enter para continuar...")
         else:
-            clear_screen()
-            print_header("CONFLITO DE DADOS")
-            print(f"  {C_YELLOW}Foram encontrados dados locais neste computador e dados na nuvem.{C_RESET}")
-            print(f"  [{C_CYAN}1{C_RESET}] 💻 Manter DADOS LOCAIS (sobrescreverá a nuvem com os dados locais)")
-            print(f"  [{C_CYAN}2{C_RESET}] ☁️ Baixar DADOS DA NUVEM (sobrescreverá os dados locais deste computador)")
-            print_divider()
+            dados_locais = carregar_dados()
             
-            escolha = ""
-            while escolha not in ["1", "2"]:
-                escolha = input("Escolha uma opção: ").strip()
-                if escolha == "1":
-                    dados = carregar_dados()
-                    dados["sync_pending"] = True
-                    salvar_local(dados)
-                    print(f"\n{C_GREEN}Mantendo dados locais. Eles serão sincronizados na nuvem em breve.{C_RESET}")
-                    input("\nPressione Enter para continuar...")
-                elif escolha == "2":
-                    dados = dados_nuvem
-                    dados["sync_pending"] = False
-                    salvar_local(dados)
-                    print(f"\n{C_GREEN}Dados da nuvem aplicados localmente com sucesso!{C_RESET}")
-                    input("\nPressione Enter para continuar...")
-                else:
-                    print(f"\n{C_RED}Opção inválida!{C_RESET}")
+            # 1. Se os dados locais estiverem vazios/zerados e a nuvem não,
+            #    prioriza a nuvem automaticamente por segurança.
+            if e_vazio(dados_locais) and not e_vazio(dados_nuvem):
+                dados = dados_nuvem
+                dados["sync_pending"] = False
+                salvar_local(dados)
+                clear_screen()
+                print_header("RESTAURAÇÃO AUTOMÁTICA")
+                print(f"\n{C_GREEN}Dados locais vazios detectados. Restaurando ciclo da nuvem...{C_RESET}")
+                input("\nPressione Enter para continuar...")
+                
+            # 2. Se a nuvem estiver vazia e o local não, mantém o local.
+            elif not e_vazio(dados_locais) and e_vazio(dados_nuvem):
+                dados = dados_locais
+                dados["sync_pending"] = True
+                salvar_local(dados)
+                
+            # 3. Compara o conteúdo estrutural (ignorando campos de controle/timestamps)
+            elif limpar_meta_dados(dados_locais) == limpar_meta_dados(dados_nuvem):
+                dados = dados_locais
+                dados["sync_pending"] = False
+                salvar_local(dados)
+                
+            # 4. Compara timestamps de atualização
+            else:
+                updated_local = dados_locais.get("updated_at")
+                updated_nuvem = dados_nuvem.get("updated_at")
+                
+                resolvido = False
+                if updated_local and updated_nuvem:
+                    try:
+                        from datetime import datetime
+                        dt_local = datetime.fromisoformat(updated_local)
+                        dt_nuvem = datetime.fromisoformat(updated_nuvem)
+                        
+                        if dt_local > dt_nuvem:
+                            # Local é mais recente, mantém local e agenda sync
+                            dados = dados_locais
+                            dados["sync_pending"] = True
+                            salvar_local(dados)
+                            resolvido = True
+                        elif dt_nuvem > dt_local:
+                            # Nuvem é mais recente, baixa da nuvem
+                            dados = dados_nuvem
+                            dados["sync_pending"] = False
+                            salvar_local(dados)
+                            resolvido = True
+                    except Exception:
+                        pass
+                
+                if not resolvido:
+                    # Caso de fallback: exibe tela de conflito manual
+                    clear_screen()
+                    print_header("CONFLITO DE DADOS")
+                    print(f"  {C_YELLOW}Foram encontrados dados locais neste computador e dados na nuvem.{C_RESET}")
+                    print(f"  [{C_CYAN}1{C_RESET}] 💻 Manter DADOS LOCAIS (sobrescreverá a nuvem com os dados locais)")
+                    print(f"  [{C_CYAN}2{C_RESET}] ☁️ Baixar DADOS DA NUVEM (sobrescreverá os dados locais deste computador)")
+                    print_divider()
+                    
+                    escolha = ""
+                    while escolha not in ["1", "2"]:
+                        escolha = input("Escolha uma opção: ").strip()
+                        if escolha == "1":
+                            dados = dados_locais
+                            dados["sync_pending"] = True
+                            salvar_local(dados)
+                            print(f"\n{C_GREEN}Mantendo dados locais. Eles serão sincronizados na nuvem em breve.{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                        elif escolha == "2":
+                            dados = dados_nuvem
+                            dados["sync_pending"] = False
+                            salvar_local(dados)
+                            print(f"\n{C_GREEN}Dados da nuvem aplicados localmente com sucesso!{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                        else:
+                            print(f"\n{C_RED}Opção inválida!{C_RESET}")
     else:
         dados = carregar_dados()
 

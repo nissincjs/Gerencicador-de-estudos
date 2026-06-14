@@ -1,6 +1,6 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from constants import DB_FILE, C_RED, C_RESET, C_YELLOW, C_GREEN, C_BOLD
 
 def obter_fator(m):
@@ -97,6 +97,8 @@ def salvar_local(dados):
     """Salva apenas localmente no arquivo JSON."""
     if "materias" in dados:
         dados["materias"].sort(key=obter_fator, reverse=True)
+    # Define timestamp de atualização em UTC
+    dados["updated_at"] = datetime.now(timezone.utc).isoformat()
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
 
