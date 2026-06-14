@@ -98,3 +98,53 @@ def fazer_cadastro(email, password):
     except Exception as e:
         raise Exception(str(e))
 
+def obter_id_usuario() -> str:
+    """Retorna o ID do usuário atualmente autenticado ou None."""
+    if not esta_configurado():
+        return None
+    try:
+        res = supabase.auth.get_user()
+        if res and res.user:
+            return res.user.id
+    except Exception:
+        pass
+    return None
+
+def enviar_dados_nuvem(dados: dict) -> bool:
+    """Envia os dados do ciclo de estudos para a tabela ciclos_usuario no Supabase."""
+    if not esta_configurado():
+        return False
+    user_id = obter_id_usuario()
+    if not user_id:
+        return False
+    try:
+        dados_upload = dados.copy()
+        if "sync_pending" in dados_upload:
+            del dados_upload["sync_pending"]
+        
+        from datetime import datetime, timezone
+        supabase.table("ciclos_usuario").upsert({
+            "user_id": user_id,
+            "dados": dados_upload,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+def baixar_dados_nuvem() -> dict:
+    """Busca os dados salvos na nuvem para o usuário logado."""
+    if not esta_configurado():
+        return None
+    user_id = obter_id_usuario()
+    if not user_id:
+        return None
+    try:
+        response = supabase.table("ciclos_usuario").select("dados").eq("user_id", user_id).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0].get("dados")
+    except Exception:
+        pass
+    return None
+
+

@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime
-from constants import DB_FILE, C_RED, C_RESET
+from constants import DB_FILE, C_RED, C_RESET, C_YELLOW, C_GREEN, C_BOLD
 
 def obter_fator(m):
     """Calcula o fator de prioridade da matéria."""
@@ -89,13 +89,53 @@ def carregar_dados():
         "revisoes": []
     }
 
+def salvar_local(dados):
+    """Salva apenas localmente no arquivo JSON."""
+    if "materias" in dados:
+        dados["materias"].sort(key=obter_fator, reverse=True)
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+
 def salvar_dados(dados):
-    """Salva os dados do ciclo de estudos em formato JSON."""
+    """Salva os dados localmente e tenta sincronizar com o Supabase."""
+    import supabase_client
+
+    # Define flag de pendência
+    dados["sync_pending"] = True
+
     try:
-        if "materias" in dados:
-            dados["materias"].sort(key=obter_fator, reverse=True)
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(dados, f, ensure_ascii=False, indent=2)
+        salvar_local(dados)
     except Exception as e:
         print(f"{C_RED}Erro ao salvar os dados em {DB_FILE}: {e}{C_RESET}")
         input("Pressione Enter para continuar...")
+        return
+
+    # Tenta enviar para a nuvem
+    if supabase_client.esta_configurado() and supabase_client.obter_id_usuario():
+        print(f"\n{C_YELLOW}Sincronizando com o Supabase...{C_RESET}", end="", flush=True)
+        if supabase_client.enviar_dados_nuvem(dados):
+            dados["sync_pending"] = False
+            try:
+                salvar_local(dados)
+            except Exception:
+                pass
+            print(f"\r{C_GREEN}✓ Sincronizado com o Supabase com sucesso!{C_RESET}      ")
+        else:
+            print(f"\r{C_RED}✗ Falha na sincronização. Salvo localmente (pendente).{C_RESET}      ")
+
+def sincronizar_pendencias(dados):
+    """Tenta sincronizar quaisquer dados locais pendentes com a nuvem."""
+    import supabase_client
+    if dados.get("sync_pending", False):
+        if supabase_client.esta_configurado() and supabase_client.obter_id_usuario():
+            print(f"{C_YELLOW}Sincronizando alterações pendentes com o Supabase...{C_RESET}", end="", flush=True)
+            if supabase_client.enviar_dados_nuvem(dados):
+                dados["sync_pending"] = False
+                try:
+                    salvar_local(dados)
+                except Exception:
+                    pass
+                print(f"\r{C_GREEN}✓ Alterações pendentes sincronizadas com sucesso!{C_RESET}      ")
+            else:
+                print(f"\r{C_RED}✗ Não foi possível sincronizar com o Supabase. Continuará offline.{C_RESET}      ")
+

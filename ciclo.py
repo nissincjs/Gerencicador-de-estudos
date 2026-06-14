@@ -6,12 +6,13 @@ from constants import (
 from utils import (
     clear_screen, print_header, print_divider
 )
-from database import carregar_dados
+from database import carregar_dados, salvar_local, sincronizar_pendencias
 from actions import (
     menu_ciclo_progresso, menu_materias, exibir_historico,
     configuracao_inicial, verificar_atualizacao
 )
 from reviews import menu_revisoes
+import os
 
 def main():
     # Verifica se o Supabase está devidamente configurado
@@ -89,7 +90,49 @@ def main():
             print(f"\n{C_RED}Opção inválida!{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
-    dados = carregar_dados()
+    # Fluxo de Sincronização Local + Nuvem
+    dados_nuvem = supabase_client.baixar_dados_nuvem()
+    local_exists = os.path.exists(DB_FILE)
+    dados = None
+
+    if dados_nuvem:
+        if not local_exists:
+            clear_screen()
+            print_header("RESTAURAÇÃO DE DADOS DA NUVEM")
+            print(f"\n{C_GREEN}Dados salvos encontrados no Supabase! Recriando ciclo local...{C_RESET}")
+            dados = dados_nuvem
+            salvar_local(dados)
+            input("\nPressione Enter para continuar...")
+        else:
+            clear_screen()
+            print_header("CONFLITO DE DADOS")
+            print(f"  {C_YELLOW}Foram encontrados dados locais neste computador e dados na nuvem.{C_RESET}")
+            print(f"  [{C_CYAN}1{C_RESET}] 💻 Manter DADOS LOCAIS (sobrescreverá a nuvem com os dados locais)")
+            print(f"  [{C_CYAN}2{C_RESET}] ☁️ Baixar DADOS DA NUVEM (sobrescreverá os dados locais deste computador)")
+            print_divider()
+            
+            escolha = ""
+            while escolha not in ["1", "2"]:
+                escolha = input("Escolha uma opção: ").strip()
+                if escolha == "1":
+                    dados = carregar_dados()
+                    dados["sync_pending"] = True
+                    salvar_local(dados)
+                    print(f"\n{C_GREEN}Mantendo dados locais. Eles serão sincronizados na nuvem em breve.{C_RESET}")
+                    input("\nPressione Enter para continuar...")
+                elif escolha == "2":
+                    dados = dados_nuvem
+                    dados["sync_pending"] = False
+                    salvar_local(dados)
+                    print(f"\n{C_GREEN}Dados da nuvem aplicados localmente com sucesso!{C_RESET}")
+                    input("\nPressione Enter para continuar...")
+                else:
+                    print(f"\n{C_RED}Opção inválida!{C_RESET}")
+    else:
+        dados = carregar_dados()
+
+    # Tenta sincronizar pendências imediatamente ao abrir
+    sincronizar_pendencias(dados)
     
     # Se for o primeiro acesso (sem horas configuradas e sem matérias)
     if dados["horas_semanais"] == 0.0 and not dados["materias"]:
