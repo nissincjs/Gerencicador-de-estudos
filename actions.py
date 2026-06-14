@@ -514,8 +514,188 @@ def exibir_historico_ciclos(dados):
         
     input("\nPressione Enter para voltar...")
 
+def adicionar_sessao_estudo_manual(dados):
+    """Permite adicionar uma nova sessão de estudos manual com data personalizada."""
+    clear_screen()
+    print_header("ADICIONAR REGISTRO DE ESTUDO MANUAL")
+    
+    materias = dados.get("materias", [])
+    if not materias:
+        print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada. Cadastre uma matéria primeiro.{C_RESET}")
+        input("\nPressione Enter para continuar...")
+        return
+        
+    # 1. Matéria
+    print("Selecione a Matéria:")
+    for i, m in enumerate(materias, start=1):
+        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']}")
+    print_divider()
+    op_mat = obter_input_float("Escolha o número da matéria: ", min_val=1, max_val=len(materias))
+    materia_nome = materias[int(op_mat) - 1]["nome"]
+    
+    # 2. Horas
+    print(f"\nFormatos aceitos: 1.5 (1h30min), 1:30 (1h30min), 45m (45 minutos)")
+    while True:
+        entrada_tempo = obter_input_str("Quanto tempo você estudou? ")
+        try:
+            horas_estudadas = parse_tempo_input(entrada_tempo)
+            if horas_estudadas <= 0:
+                print(f"{C_RED}Erro: O tempo de estudo deve ser maior que zero.{C_RESET}")
+                continue
+            break
+        except ValueError as e:
+            print(f"{C_RED}Erro de formato: {e}. Tente novamente.{C_RESET}")
+            
+    # 3. Data e Hora
+    default_data = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    while True:
+        entrada_data = obter_input_str(f"Data/Hora do estudo [{default_data}]: ", obrigatorio=False, default=default_data)
+        try:
+            datetime.strptime(entrada_data, "%d/%m/%Y %H:%M:%S")
+            break
+        except ValueError:
+            print(f"{C_RED}Erro: Data inválida! Use o formato DD/MM/AAAA HH:MM:SS.{C_RESET}")
+            
+    # 4. Observação
+    obs = obter_input_str("Observação (opcional): ", obrigatorio=False)
+    
+    # Adiciona ao histórico de sessões
+    sessoes = dados.setdefault("historico_sessoes", [])
+    sessoes.append({
+        "materia": materia_nome,
+        "horas": horas_estudadas,
+        "data": entrada_data,
+        "tipo": "registro",
+        "obs": obs
+    })
+    
+    # Recalcula e salva
+    from database import recalcular_progresso_atual
+    recalcular_progresso_atual(dados)
+    salvar_dados(dados)
+    
+    tempo_formatado = formatar_horas_minutos(horas_estudadas)
+    print(f"\n{C_GREEN}✔ Registro de {tempo_formatado} em '{materia_nome}' adicionado com sucesso!{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def editar_sessao_estudo(dados, sessoes_filtradas_com_index):
+    """Edita um registro específico de sessão de estudo."""
+    clear_screen()
+    print_header("EDITAR REGISTRO DE ESTUDO")
+    
+    if not sessoes_filtradas_com_index:
+        print(f"\n{C_YELLOW}Nenhum registro para editar.{C_RESET}")
+        input("\nPressione Enter para continuar...")
+        return
+        
+    num = obter_input_float("Digite o número do registro que deseja EDITAR: ", min_val=1, max_val=len(sessoes_filtradas_com_index))
+    idx_filtro = len(sessoes_filtradas_com_index) - int(num)
+    original_idx, s = sessoes_filtradas_com_index[idx_filtro]
+    
+    clear_screen()
+    print_header(f"EDITANDO REGISTRO EM {s.get('data')}")
+    print(f"{C_YELLOW}(Deixe em branco/Pressione Enter para manter o valor atual){C_RESET}\n")
+    
+    # 1. Matéria
+    materias = dados.get("materias", [])
+    print("Selecione a Matéria:")
+    for i, m in enumerate(materias, start=1):
+        marcador = " (Atual)" if m["nome"].lower() == s.get("materia", "").lower() else ""
+        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']}{marcador}")
+    print_divider()
+    op_mat = obter_input_float(f"Escolha o número da matéria (ou Enter para manter '{s.get('materia')}'): ", min_val=0, max_val=len(materias), default=-1)
+    if op_mat == -1:
+        nova_materia = s.get("materia")
+    else:
+        nova_materia = materias[int(op_mat) - 1]["nome"]
+        
+    # 2. Horas
+    tempo_atual = formatar_horas_minutos(s.get("horas", 0.0))
+    while True:
+        entrada_tempo = input(f"Tempo de estudo [{tempo_atual}]: ").strip()
+        if not entrada_tempo:
+            novas_horas = s.get("horas", 0.0)
+            break
+        try:
+            novas_horas = parse_tempo_input(entrada_tempo)
+            if novas_horas <= 0:
+                print(f"{C_RED}Erro: O tempo de estudo deve ser maior que zero.{C_RESET}")
+                continue
+            break
+        except ValueError as e:
+            print(f"{C_RED}Erro de formato: {e}. Tente novamente.{C_RESET}")
+            
+    # 3. Data e Hora
+    while True:
+        nova_data = input(f"Data/Hora do estudo [{s.get('data')}]: ").strip()
+        if not nova_data:
+            nova_data = s.get("data")
+            break
+        try:
+            datetime.strptime(nova_data, "%d/%m/%Y %H:%M:%S")
+            break
+        except ValueError:
+            print(f"{C_RED}Erro: Data inválida! Use o formato DD/MM/AAAA HH:MM:SS.{C_RESET}")
+            
+    # 4. Observação
+    nova_obs = obter_input_str(f"Observação [{s.get('obs', '')}]: ", obrigatorio=False, default=s.get("obs", ""))
+    
+    # Atualiza o registro
+    s["materia"] = nova_materia
+    s["horas"] = novas_horas
+    s["data"] = nova_data
+    s["obs"] = nova_obs
+    s["editado_em"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    
+    # Atualiza a lista no dados
+    dados["historico_sessoes"][original_idx] = s
+    
+    # Recalcula o progresso e salva
+    from database import recalcular_progresso_atual
+    recalcular_progresso_atual(dados)
+    salvar_dados(dados)
+    
+    print(f"\n{C_GREEN}✔ Registro de estudo editado com sucesso!{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def excluir_sessao_estudo(dados, sessoes_filtradas_com_index):
+    """Exclui um registro de sessão de estudo e recalcula o progresso."""
+    clear_screen()
+    print_header("EXCLUIR REGISTRO DE ESTUDO")
+    
+    if not sessoes_filtradas_com_index:
+        print(f"\n{C_YELLOW}Nenhum registro para excluir.{C_RESET}")
+        input("\nPressione Enter para continuar...")
+        return
+        
+    num = obter_input_float("Digite o número do registro que deseja EXCLUIR: ", min_val=1, max_val=len(sessoes_filtradas_com_index))
+    idx_filtro = len(sessoes_filtradas_com_index) - int(num)
+    original_idx, s = sessoes_filtradas_com_index[idx_filtro]
+    
+    tempo_f = formatar_horas_minutos(s.get("horas", 0.0))
+    print(f"\nVocê escolheu o registro:")
+    print(f"  📅 Data:    {s.get('data')}")
+    print(f"  📚 Matéria: {s.get('materia')}")
+    print(f"  ⏱️ Tempo:   {tempo_f}")
+    print_divider()
+    
+    confirmar = obter_input_str("Deseja realmente EXCLUIR este registro? (S/N): ").upper()
+    if confirmar == 'S':
+        dados["historico_sessoes"].pop(original_idx)
+        
+        # Recalcula o progresso e salva
+        from database import recalcular_progresso_atual
+        recalcular_progresso_atual(dados)
+        salvar_dados(dados)
+        
+        print(f"\n{C_GREEN}✔ Registro excluído com sucesso!{C_RESET}")
+    else:
+        print(f"\n{C_YELLOW}Exclusão cancelada.{C_RESET}")
+        
+    input("\nPressione Enter para continuar...")
+
 def exibir_historico_sessoes(dados):
-    """Exibe o histórico detalhado de sessões de estudo (logs de progressos)."""
+    """Exibe o histórico detalhado de sessões de estudo (logs de progressos) com CRUD."""
     materia_filtro = None
     
     while True:
@@ -527,23 +707,26 @@ def exibir_historico_sessoes(dados):
             titulo += f" - {materia_filtro.upper()}"
         print_header(titulo)
         
-        # Filtra sessões se houver filtro ativo
-        sessoes_filtradas = sessoes
-        if materia_filtro:
-            sessoes_filtradas = [s for s in sessoes if s.get("materia", "").lower() == materia_filtro.lower()]
+        # Filtra sessões guardando os índices originais
+        sessoes_filtradas_com_index = []
+        for idx, s in enumerate(sessoes):
+            if not materia_filtro or s.get("materia", "").lower() == materia_filtro.lower():
+                sessoes_filtradas_com_index.append((idx, s))
             
-        if not sessoes_filtradas:
+        if not sessoes_filtradas_com_index:
             print(f"\n{C_YELLOW}⚠ Nenhuma sessão de estudo registrada.{C_RESET}")
             if materia_filtro:
                 print(f"Nenhum registro encontrado para a matéria '{materia_filtro}'.")
         else:
-            # Mostra as mais recentes primeiro
-            for s in reversed(sessoes_filtradas):
+            # Mostra as mais recentes primeiro, numerando de 1 a K
+            K = len(sessoes_filtradas_com_index)
+            for i, (original_idx, s) in enumerate(reversed(sessoes_filtradas_com_index), start=1):
                 data_hora = s.get("data", "N/A")
                 materia = s.get("materia", "N/A")
                 horas = s.get("horas", 0.0)
                 tipo = s.get("tipo", "registro")
                 obs = s.get("obs", "")
+                editado_em = s.get("editado_em", None)
                 
                 tempo_f = formatar_horas_minutos(horas)
                 
@@ -552,13 +735,19 @@ def exibir_historico_sessoes(dados):
                 else:
                     msg = f"Estudou por {C_GREEN}{tempo_f}{C_RESET}."
                 
-                print(f"  📅 {C_BOLD}{data_hora}{C_RESET}")
-                print(f"  📚 Matéria: {C_CYAN}{materia}{C_RESET}")
-                print(f"  💬 Ação:    {msg}")
+                print(f"  [{C_CYAN}{i}{C_RESET}] 📅 Realizado em: {C_BOLD}{data_hora}{C_RESET}")
+                if editado_em:
+                    print(f"      ✏️ Editado em:   {C_YELLOW}{editado_em}{C_RESET}")
+                print(f"      📚 Matéria:      {C_CYAN}{materia}{C_RESET}")
+                print(f"      💬 Ação:         {msg}")
                 if obs:
-                    print(f"  📝 Obs:     {C_YELLOW}{obs}{C_RESET}")
+                    print(f"      📝 Obs:          {C_YELLOW}{obs}{C_RESET}")
                 print_divider()
                 
+        print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Novo Registro de Estudo")
+        if sessoes_filtradas_com_index:
+            print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Registro de Estudo")
+            print(f"  [{C_CYAN}3{C_RESET}] ❌ Excluir Registro de Estudo")
         print(f"  [{C_CYAN}F{C_RESET}] Filtrar por Matéria")
         if materia_filtro:
             print(f"  [{C_CYAN}T{C_RESET}] Remover Filtro (Mostrar Todas)")
@@ -566,9 +755,15 @@ def exibir_historico_sessoes(dados):
         print(f"  [{C_CYAN}0{C_RESET}] Voltar ao Menu de Históricos")
         print_divider()
         
-        opcao = input("Escolha uma opção (ou Enter para voltar): ").strip().upper()
+        opcao = input("Escolha uma opção: ").strip().upper()
         if not opcao or opcao == "0":
             break
+        elif opcao == "1":
+            adicionar_sessao_estudo_manual(dados)
+        elif opcao == "2" and sessoes_filtradas_com_index:
+            editar_sessao_estudo(dados, sessoes_filtradas_com_index)
+        elif opcao == "3" and sessoes_filtradas_com_index:
+            excluir_sessao_estudo(dados, sessoes_filtradas_com_index)
         elif opcao == "F":
             materias = dados.get("materias", [])
             if not materias:
@@ -592,6 +787,8 @@ def exibir_historico_sessoes(dados):
                 confirmar2 = obter_input_str("Digite 'CONFIRMAR' para prosseguir com a exclusão definitiva: ").upper()
                 if confirmar2 == "CONFIRMAR":
                     dados["historico_sessoes"] = []
+                    from database import recalcular_progresso_atual
+                    recalcular_progresso_atual(dados)
                     salvar_dados(dados)
                     print(f"\n{C_GREEN}✔ Histórico de sessões apagado com sucesso!{C_RESET}")
                     input("\nPressione Enter para continuar...")

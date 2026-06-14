@@ -145,3 +145,44 @@ def sincronizar_pendencias(dados):
             else:
                 print(f"\r{C_RED}✗ Não foi possível sincronizar com o Supabase. Continuará offline.{C_RESET}      ")
 
+def recalcular_progresso_atual(dados):
+    """Recalcula o progresso_atual das matérias com base no histórico de sessões do ciclo atual."""
+    progresso = {}
+    for m in dados.get("materias", []):
+        progresso[m["nome"]] = 0.0
+        
+    sessoes = dados.get("historico_sessoes", [])
+    data_inicio_str = dados.get("data_inicio_ciclo")
+    
+    dt_inicio = None
+    if data_inicio_str:
+        try:
+            dt_inicio = datetime.strptime(data_inicio_str, "%d/%m/%Y %H:%M:%S")
+        except Exception:
+            pass
+            
+    # Processa as sessões em ordem cronológica
+    for s in sessoes:
+        materia = s.get("materia")
+        horas = s.get("horas", 0.0)
+        tipo = s.get("tipo", "registro")
+        data_str = s.get("data", "")
+        
+        if tipo in ["registro", "ajuste"] and materia in progresso:
+            pertence_ao_ciclo = True
+            if dt_inicio and data_str:
+                try:
+                    dt_sessao = datetime.strptime(data_str, "%d/%m/%Y %H:%M:%S")
+                    if dt_sessao < dt_inicio:
+                        pertence_ao_ciclo = False
+                except Exception:
+                    pass
+            
+            if pertence_ao_ciclo:
+                if tipo == "registro":
+                    progresso[materia] += horas
+                elif tipo == "ajuste":
+                    progresso[materia] = horas
+                    
+    dados["progresso_atual"] = progresso
+
