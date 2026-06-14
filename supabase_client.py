@@ -209,13 +209,19 @@ def vincular_parceiro(codigo_convite: str):
     if alvo_user_id == current_user_id:
         raise Exception("Você não pode vincular seu próprio código!")
         
-    if alvo.get("parceiro_id"):
-        raise Exception("Este usuário já possui um parceiro de estudos.")
-        
     # Busca perfil atual
     res_atual = supabase.table("perfis_usuario").select("*").eq("user_id", current_user_id).execute()
-    if res_atual.data and res_atual.data[0].get("parceiro_id"):
-        raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
+    
+    if res_atual.data:
+        perfil_atual = res_atual.data[0]
+        # Se já estiverem mutuamente vinculados kkk
+        if perfil_atual.get("parceiro_id") == alvo_user_id:
+            raise Exception("Vocês já estão vinculados! Volte ao menu anterior para atualizar a tela.")
+        if perfil_atual.get("parceiro_id"):
+            raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
+            
+    if alvo.get("parceiro_id"):
+        raise Exception("Este usuário já possui um parceiro de estudos.")
         
     # Vincula mutuamente
     try:
