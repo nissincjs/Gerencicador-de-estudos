@@ -92,8 +92,8 @@ def exibir_calendario_consistencia(dados):
     }
     nome_mes = nomes_meses.get(mes, "Mês Atual")
     
-    print(f"\n  {C_BOLD}Calendário de Consistência - {nome_mes} / {ano}{C_RESET}")
-    print("  DOM  SEG  TER  QUA  QUI  SEX  SAB")
+    print(f"\n  {C_BOLD}📅 Calendário de Consistência - {nome_mes} / {ano}{C_RESET}")
+    print(f"  {C_CYAN}{C_BOLD}DOM  SEG  TER  QUA  QUI  SEX  SAB{C_RESET}")
     
     primeiro_dia_semana, num_dias = calendar.monthrange(ano, mes)
     primeiro_dia_nossa_semana = (primeiro_dia_semana + 1) % 7
@@ -133,12 +133,12 @@ def exibir_calendario_consistencia(dados):
             
     linha = "  "
     for _ in range(primeiro_dia_nossa_semana):
-        linha += "    "
+        linha += "     "
         
     dia_atual = 1
     coluna = primeiro_dia_nossa_semana
     while dia_atual <= num_dias:
-        linha += f" {status_dias[dia_atual]} "
+        linha += f" {status_dias[dia_atual]}  "
         dia_atual += 1
         coluna += 1
         
@@ -150,7 +150,7 @@ def exibir_calendario_consistencia(dados):
     if coluna > 0:
         print(linha)
         
-    print(f"\n  Legenda: 🟩 Estudou | 🟥 Não Estudou | 🟨 Justificado | ⬜ Futuro")
+    print(f"\n  {C_BOLD}Legenda:{C_RESET} 🟩 Estudou | 🟥 Não Estudou | 🟨 Justificado | ⬜ Futuro")
 
 def exibir_status_parceiro(perfil_parceiro):
     """Exibe o painel de métricas de estudo do parceiro."""
