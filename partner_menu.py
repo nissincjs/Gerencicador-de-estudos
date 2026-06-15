@@ -9,14 +9,93 @@ from utils import (
 )
 from database import salvar_dados
 
-def calcular_streak(sessoes: list) -> int:
-    """Calcula a sequência de dias seguidos estudando."""
-    datas_estudadas = set()
-    for s in sessoes:
-        if s.get("tipo") == "registro":
+def calcular_estudos_por_dia(dados: dict) -> dict:
+    """
+    Processa todas as sessões cronologicamente para calcular a variação real
+    de horas estudadas por dia e por matéria, considerando ajustes e reinícios de ciclo.
+    Retorna um dicionário: { dia_str: { materia: delta_horas } }
+    """
+    sessoes = dados.get("historico_sessoes", [])
+    historico_ciclos = dados.get("historico_ciclos", [])
+    
+    # Coleta e ordena os marcos de reinício de ciclo
+    datas_fim_ciclos = []
+    for c in historico_ciclos:
+        dt_fim_str = c.get("data_fim")
+        if dt_fim_str:
             try:
-                dt_str = s.get("data", "").split()[0]
-                dt = datetime.strptime(dt_str, "%d/%m/%Y").date()
+                datas_fim_ciclos.append(datetime.strptime(dt_fim_str, "%d/%m/%Y %H:%M:%S"))
+            except Exception:
+                pass
+    datas_fim_ciclos.sort()
+    
+    # Ordena as sessões por data
+    def obter_data_sessao(s):
+        try:
+            return datetime.strptime(s.get("data", ""), "%d/%m/%Y %H:%M:%S")
+        except Exception:
+            try:
+                return datetime.strptime(s.get("data", "").split()[0], "%d/%m/%Y")
+            except Exception:
+                return datetime.min
+
+    sessoes_ordenadas = sorted(sessoes, key=obter_data_sessao)
+    
+    progresso = {}  # { materia: total_acumulado }
+    estudos_por_dia = {}  # { dia_str: { materia: delta_horas } }
+    
+    ciclos_processados = 0
+    
+    for s in sessoes_ordenadas:
+        materia = s.get("materia")
+        horas = s.get("horas", 0.0)
+        tipo = s.get("tipo", "registro")
+        data_completa = s.get("data", "")
+        if not data_completa:
+            continue
+            
+        try:
+            dt_sessao = datetime.strptime(data_completa, "%d/%m/%Y %H:%M:%S")
+        except Exception:
+            try:
+                dt_sessao = datetime.strptime(data_completa.split()[0], "%d/%m/%Y")
+            except Exception:
+                dt_sessao = datetime.min
+                
+        # Verifica se essa sessão cruzou a linha de fim de algum ciclo concluído
+        while (ciclos_processados < len(datas_fim_ciclos) and 
+               dt_sessao > datas_fim_ciclos[ciclos_processados]):
+            progresso = {}
+            ciclos_processados += 1
+            
+        dia_str = data_completa.split()[0]
+        anterior = progresso.get(materia, 0.0)
+        
+        if tipo == "registro":
+            delta = horas
+            progresso[materia] = anterior + horas
+        elif tipo == "ajuste":
+            delta = max(-anterior, horas - anterior)
+            progresso[materia] = horas
+        else:
+            continue
+            
+        if dia_str not in estudos_por_dia:
+            estudos_por_dia[dia_str] = {}
+            
+        estudos_por_dia[dia_str][materia] = estudos_por_dia[dia_str].get(materia, 0.0) + delta
+        
+    return estudos_por_dia
+
+def calcular_streak(dados: dict) -> int:
+    """Calcula a sequência de dias seguidos estudando."""
+    estudos_por_dia = calcular_estudos_por_dia(dados)
+    
+    datas_estudadas = set()
+    for dia_str, materias_estudo in estudos_por_dia.items():
+        if sum(materias_estudo.values()) > 0.016:  # Mais de 1 minuto estudado
+            try:
+                dt = datetime.strptime(dia_str, "%d/%m/%Y").date()
                 datas_estudadas.add(dt)
             except Exception:
                 pass
@@ -39,21 +118,24 @@ def calcular_streak(sessoes: list) -> int:
         
     return streak
 
-def obter_estudos_hoje(sessoes: list) -> dict:
+def obter_estudos_hoje(dados: dict) -> dict:
     """Retorna informações sobre os estudos realizados no dia de hoje."""
     hoje_str = date.today().strftime("%d/%m/%Y")
-    sessoes_hoje = []
-    for s in sessoes:
-        if s.get("tipo") == "registro" and s.get("data", "").startswith(hoje_str):
-            sessoes_hoje.append(s)
-            
-    total_horas = sum(s.get("horas", 0.0) for s in sessoes_hoje)
-    materias = list(set(s.get("materia") for s in sessoes_hoje))
+    estudos_por_dia = calcular_estudos_por_dia(dados)
     
+    materias_hoje = []
+    total_horas = 0.0
+    
+    estudos_hoje = estudos_por_dia.get(hoje_str, {})
+    for mat, horas in estudos_hoje.items():
+        if horas > 0.016:  # Mais de 1 minuto estudado
+            total_horas += horas
+            materias_hoje.append(mat)
+            
     return {
-        "estudou": len(sessoes_hoje) > 0,
+        "estudou": total_horas > 0.016,
         "total_horas": total_horas,
-        "materias": materias
+        "materias": materias_hoje
     }
 
 def obter_metas_semana(dados: dict) -> dict:
@@ -98,7 +180,7 @@ def exibir_calendario_consistencia(dados):
     primeiro_dia_semana, num_dias = calendar.monthrange(ano, mes)
     primeiro_dia_nossa_semana = (primeiro_dia_semana + 1) % 7
     
-    sessoes = dados.get("historico_sessoes", [])
+    estudos_por_dia = calcular_estudos_por_dia(dados)
     justificativas = dados.get("justificativas", [])
     
     status_dias = {}
@@ -107,12 +189,8 @@ def exibir_calendario_consistencia(dados):
         dia_str = dia_date.strftime("%d/%m/%Y")
         
         # Verifica se estudou
-        estudou = False
-        for s in sessoes:
-            if s.get("tipo") == "registro" and s.get("data", "").startswith(dia_str):
-                if s.get("horas", 0.0) > 0:
-                    estudou = True
-                    break
+        horas_dia = sum(estudos_por_dia.get(dia_str, {}).values())
+        estudou = horas_dia > 0.016
         
         # Verifica se justificou
         justificou = False
@@ -166,9 +244,8 @@ def exibir_status_parceiro(perfil_parceiro):
         input("\nPressione Enter para voltar...")
         return
         
-    sessoes = dados_parceiro.get("historico_sessoes", [])
-    estudos_hoje = obter_estudos_hoje(sessoes)
-    streak = calcular_streak(sessoes)
+    estudos_hoje = obter_estudos_hoje(dados_parceiro)
+    streak = calcular_streak(dados_parceiro)
     metas = obter_metas_semana(dados_parceiro)
     justificativas = dados_parceiro.get("justificativas", [])
     
