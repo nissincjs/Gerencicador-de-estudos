@@ -62,52 +62,77 @@ def obter_input_str(prompt, obrigatorio=True, default=None):
         return entrada
 
 def parse_tempo_input(entrada):
-    """Interpreta formatos de tempo flexíveis como '1.5', '1:30', '90m' ou '90min'."""
+    """Interpreta formatos de tempo flexíveis como '1.5', '1:30', '1:30:12', '90m', '1h30m12s', etc."""
     entrada = entrada.strip().lower()
     if not entrada:
         raise ValueError("Entrada vazia")
         
-    # 1. Formato H:MM (ex: 1:30, 0:45)
+    # 1. Formato com dois pontos (ex: 1:30:12 ou 1:30)
     if ":" in entrada:
         partes = entrada.split(":")
-        if len(partes) == 2:
+        if len(partes) == 3:
             h = float(partes[0])
             m = float(partes[1])
-            if m < 0 or m >= 60 or h < 0:
+            s = float(partes[2])
+            if h < 0 or m < 0 or m >= 60 or s < 0 or s >= 60:
+                raise ValueError("Valores de horas/minutos/segundos inválidos.")
+            return h + m / 60.0 + s / 3600.0
+        elif len(partes) == 2:
+            h = float(partes[0])
+            m = float(partes[1])
+            if h < 0 or m < 0 or m >= 60:
                 raise ValueError("Minutos devem estar entre 0 e 59.")
             return h + m / 60.0
             
-    # 2. Formato com h e m (ex: 1h30m, 1h 30min, 45m)
-    if 'h' in entrada or 'm' in entrada:
+    # 2. Formato com sufixos (h, m, s)
+    if any(char in entrada for char in ['h', 'm', 's']):
         horas = 0.0
         minutos = 0.0
+        segundos = 0.0
         
-        match_h = re.search(r'(\d+(?:\.\d+)?)\s*h', entrada)
+        match_h = re.search(r'(\d+(?:\.\d+)?)\s*(?:h|hs|hora|horas)', entrada)
         if match_h:
             horas = float(match_h.group(1))
             
-        match_m = re.search(r'(\d+(?:\.\d+)?)\s*m', entrada)
+        match_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:m|min|minuto|minutos)', entrada)
         if match_m:
             minutos = float(match_m.group(1))
             
-        if 'h' not in entrada and 'm' in entrada:
-            # Caso o usuário digite apenas minutos (ex: 45m ou 45min)
-            match_so_m = re.match(r'^(\d+(?:\.\d+)?)\s*(?:m|min)', entrada)
-            if match_so_m:
-                return float(match_so_m.group(1)) / 60.0
-                
-        return horas + minutos / 60.0
+        match_s = re.search(r'(\d+(?:\.\d+)?)\s*(?:s|seg|segundo|segundos)', entrada)
+        if match_s:
+            segundos = float(match_s.group(1))
+            
+        # Validar se conseguimos extrair alguma coisa válida
+        if not match_h and not match_m and not match_s:
+            raise ValueError("Não foi possível extrair tempo válido do formato com sufixos.")
+            
+        return horas + minutos / 60.0 + segundos / 3600.0
         
     # 3. Decimal simples (ex: 1.5)
     return float(entrada)
 
 def formatar_horas_minutos(horas_decimais):
-    """Converte horas decimais em formato legível como 'Xh YYmin'."""
+    """Converte horas decimais em formato legível como 'Xh YYm ZZs', 'YYm ZZs' ou 'ZZs'."""
     if horas_decimais <= 0:
-        return "0h 00min"
-    horas = int(horas_decimais)
-    minutos = round((horas_decimais - horas) * 60)
-    if minutos == 60:
-        horas += 1
-        minutos = 0
-    return f"{horas}h {minutos:02d}min"
+        return "0s"
+        
+    total_segundos = round(horas_decimais * 3600)
+    if total_segundos <= 0:
+        return "0s"
+        
+    horas = total_segundos // 3600
+    minutos = (total_segundos % 3600) // 60
+    segundos = total_segundos % 60
+    
+    partes = []
+    if horas > 0:
+        partes.append(f"{horas}h")
+    if minutos > 0:
+        partes.append(f"{minutos}m")
+    if segundos > 0:
+        partes.append(f"{segundos}s")
+        
+    if not partes:
+        return "0s"
+        
+    return " ".join(partes)

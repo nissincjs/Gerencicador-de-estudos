@@ -23,9 +23,9 @@ def exibir_ciclo(dados, pausar=True):
     w_quest = 6
     w_peso = 7
     w_dif = 3
-    w_meta = 9
-    w_estudado = 9
-    w_restante = 9
+    w_meta = 12
+    w_estudado = 12
+    w_restante = 12
     
     # Calcula a largura total da tabela para alinhar perfeitamente cabeçalho, divisores e bordas
     # (7 colunas + 7 separadores de 2 espaços + 8 barras verticais = w_materia + w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22)
@@ -109,7 +109,7 @@ def exibir_ciclo(dados, pausar=True):
         estudado_formatada = formatar_horas_minutos(estudado_horas)
         
         # Formata o restante com indicativo visual de concluído
-        if restante_horas <= 0.016:  # Limiar de 1 minuto de margem
+        if restante_horas <= 0.00027:  # Limiar de 1 segundo de margem
             restante_formatada = "Concluído"
         else:
             restante_formatada = formatar_horas_minutos(restante_horas)
@@ -312,8 +312,8 @@ def verificar_conclusao_ciclo(dados):
         pct = (fator / fator_total) if fator_total > 0 else 0
         meta = pct * horas_totais
         estudado = progresso.get(m["nome"], 0.0)
-        # Se restarem mais de 1 minuto (0.016 horas)
-        if meta - estudado > 0.016:
+        # Se restarem mais de 1 segundo (0.00027 horas)
+        if meta - estudado > 0.00027:
             concluiu_tudo = False
             break
             
@@ -382,7 +382,7 @@ def registrar_progresso(dados):
     materia_nome = materias[idx]['nome']
     
     print(f"\nRegistrando progresso para: {C_BOLD}{materia_nome}{C_RESET}")
-    print(f"Formatos aceitos: {C_YELLOW}1.5{C_RESET} (1h30min), {C_YELLOW}1:30{C_RESET} (1h30min), {C_YELLOW}45m{C_RESET} (45 minutos)")
+    print(f"Formatos aceitos: {C_YELLOW}1.5{C_RESET} (1h30m), {C_YELLOW}1:30{C_RESET} (1h30m), {C_YELLOW}1:30:12{C_RESET} (1h30m12s), {C_YELLOW}1h27m{C_RESET}, {C_YELLOW}30m12s{C_RESET}, {C_YELLOW}50s{C_RESET}")
     
     while True:
         entrada_tempo = obter_input_str("Quanto tempo você estudou? ")
@@ -452,7 +452,7 @@ def ajustar_progresso(dados):
     
     print(f"\nAjustando progresso acumulado para: {C_BOLD}{materia_nome}{C_RESET}")
     print(f"Progresso atual: {C_GREEN}{tempo_atual_formatado}{C_RESET}")
-    print(f"Formatos aceitos: {C_YELLOW}1.5{C_RESET} (1h30min), {C_YELLOW}1:30{C_RESET} (1h30min), {C_YELLOW}45m{C_RESET} (45 minutos)")
+    print(f"Formatos aceitos: {C_YELLOW}1.5{C_RESET} (1h30m), {C_YELLOW}1:30{C_RESET} (1h30m), {C_YELLOW}1:30:12{C_RESET} (1h30m12s), {C_YELLOW}1h27m{C_RESET}, {C_YELLOW}30m12s{C_RESET}, {C_YELLOW}50s{C_RESET}")
     print(f"{C_YELLOW}(Deixe em branco/Pressione Enter para manter o valor atual){C_RESET}\n")
     
     while True:
@@ -537,7 +537,7 @@ def adicionar_sessao_estudo_manual(dados):
     materia_nome = materias[int(op_mat) - 1]["nome"]
     
     # 2. Horas
-    print(f"\nFormatos aceitos: 1.5 (1h30min), 1:30 (1h30min), 45m (45 minutos)")
+    print(f"\nFormatos aceitos: {C_YELLOW}1.5{C_RESET} (1h30m), {C_YELLOW}1:30{C_RESET} (1h30m), {C_YELLOW}1:30:12{C_RESET} (1h30m12s), {C_YELLOW}1h27m{C_RESET}, {C_YELLOW}30m12s{C_RESET}, {C_YELLOW}50s{C_RESET}")
     while True:
         entrada_tempo = obter_input_str("Quanto tempo você estudou? ")
         try:

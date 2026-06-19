@@ -93,7 +93,7 @@ def calcular_streak(dados: dict) -> int:
     
     datas_estudadas = set()
     for dia_str, materias_estudo in estudos_por_dia.items():
-        if sum(materias_estudo.values()) > 0.016:  # Mais de 1 minuto estudado
+        if sum(materias_estudo.values()) >= 0.00027:  # Mais de 1 segundo estudado
             try:
                 dt = datetime.strptime(dia_str, "%d/%m/%Y").date()
                 datas_estudadas.add(dt)
@@ -128,12 +128,12 @@ def obter_estudos_hoje(dados: dict) -> dict:
     
     estudos_hoje = estudos_por_dia.get(hoje_str, {})
     for mat, horas in estudos_hoje.items():
-        if horas > 0.016:  # Mais de 1 minuto estudado
+        if horas >= 0.00027:  # Mais de 1 segundo estudado
             total_horas += horas
             materias_hoje.append(mat)
             
     return {
-        "estudou": total_horas > 0.016,
+        "estudou": total_horas >= 0.00027,
         "total_horas": total_horas,
         "materias": materias_hoje
     }
@@ -155,7 +155,7 @@ def obter_metas_semana(dados: dict) -> dict:
         pct = (f / fator_total) if fator_total > 0 else 0
         meta = pct * horas_totais
         estudado = progresso.get(m["nome"], 0.0)
-        if estudado >= meta - 0.016:  # Margem de 1 minuto
+        if estudado >= meta - 0.00027:  # Margem de 1 segundo
             cumpridas += 1
             
     return {"cumpridas": cumpridas, "total": len(materias)}
@@ -190,7 +190,7 @@ def exibir_calendario_consistencia(dados):
         
         # Verifica se estudou
         horas_dia = sum(estudos_por_dia.get(dia_str, {}).values())
-        estudou = horas_dia > 0.016
+        estudou = horas_dia >= 0.00027
         
         # Verifica se justificou
         justificou = False
