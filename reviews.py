@@ -751,64 +751,70 @@ def alterar_limite_revisoes(dados):
 def menu_revisoes(dados):
     """Submenu de controle de revisões estratégicas."""
     while True:
-        clear_screen()
-        print_header("REVISÕES ESTRATÉGICAS (REPETIÇÃO ESPAÇADA)")
-        
-        hoje = datetime.now().date()
-        pendentes_totais_qtd = 0
-        for r in dados.get("revisoes", []):
+        try:
+            clear_screen()
+            print_header("REVISÕES ESTRATÉGICAS (REPETIÇÃO ESPAÇADA)")
+            
+            hoje = datetime.now().date()
+            pendentes_totais_qtd = 0
+            for r in dados.get("revisoes", []):
+                try:
+                    dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
+                    if dt_rev <= hoje:
+                        pendentes_totais_qtd += 1
+                except ValueError:
+                    pass
+                    
+            revisoes_totais = len(dados.get("revisoes", []))
+            
+            # Obtém a lista limitada
+            pendentes_limitados = obter_revisoes_filtradas_e_ordenadas(dados)
+            pendentes_lim_qtd = len(pendentes_limitados)
+            
+            limite_diario = dados.get("limite_revisoes_diarias", 10)
+            limite_str = f"{limite_diario}" if limite_diario > 0 else "Sem Limite"
+            
+            if limite_diario > 0 and pendentes_totais_qtd > limite_diario:
+                pendentes_exibicao = f"{C_YELLOW}{pendentes_lim_qtd} (Total: {pendentes_totais_qtd}){C_RESET}"
+            else:
+                pendentes_exibicao = f"{C_GREEN if pendentes_lim_qtd == 0 else C_YELLOW}{pendentes_lim_qtd}{C_RESET}"
+            
+            print(f"  {C_BOLD}Pendentes para Hoje:{C_RESET} {pendentes_exibicao}   |   {C_BOLD}Total Cadastrado:{C_RESET} {C_GREEN}{revisoes_totais}{C_RESET}   |   {C_BOLD}Limite Diário:{C_RESET} {C_GREEN}{limite_str}{C_RESET}")
+            print_divider()
+            
+            print(f"  [{C_CYAN}1{C_RESET}] 📋 Ver Revisões Pendentes para Hoje")
+            print(f"  [{C_CYAN}2{C_RESET}] 📚 Ver Todas as Revisões Cadastradas")
+            print(f"  [{C_CYAN}3{C_RESET}] ➕ Adicionar Nova Revisão")
+            print(f"  [{C_CYAN}4{C_RESET}] ✏️  Editar Revisão Existente")
+            print(f"  [{C_CYAN}5{C_RESET}] ❌ Remover Revisão")
+            print(f"  [{C_CYAN}6{C_RESET}] ✅ Marcar Revisão como Concluída (Estudar)")
+            print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Limite Diário de Revisões")
+            print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            
             try:
-                dt_rev = datetime.strptime(r["data_proxima_revisao"], "%d/%m/%Y").date()
-                if dt_rev <= hoje:
-                    pendentes_totais_qtd += 1
-            except ValueError:
+                if opcao == "1":
+                    ver_revisoes_opcao(dados, apenas_pendentes=True)
+                elif opcao == "2":
+                    ver_revisoes_opcao(dados, apenas_pendentes=False)
+                elif opcao == "3":
+                    adicionar_revisao(dados)
+                elif opcao == "4":
+                    editar_revisao(dados)
+                elif opcao == "5":
+                    remover_revisao(dados)
+                elif opcao == "6":
+                    concluir_revisao(dados)
+                elif opcao == "7":
+                    alterar_limite_revisoes(dados)
+                elif opcao == "0":
+                    break
+                else:
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 7.{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
                 pass
-                
-        revisoes_totais = len(dados.get("revisoes", []))
-        
-        # Obtém a lista limitada
-        pendentes_limitados = obter_revisoes_filtradas_e_ordenadas(dados)
-        pendentes_lim_qtd = len(pendentes_limitados)
-        
-        limite_diario = dados.get("limite_revisoes_diarias", 10)
-        limite_str = f"{limite_diario}" if limite_diario > 0 else "Sem Limite"
-        
-        if limite_diario > 0 and pendentes_totais_qtd > limite_diario:
-            pendentes_exibicao = f"{C_YELLOW}{pendentes_lim_qtd} (Total: {pendentes_totais_qtd}){C_RESET}"
-        else:
-            pendentes_exibicao = f"{C_GREEN if pendentes_lim_qtd == 0 else C_YELLOW}{pendentes_lim_qtd}{C_RESET}"
-        
-        print(f"  {C_BOLD}Pendentes para Hoje:{C_RESET} {pendentes_exibicao}   |   {C_BOLD}Total Cadastrado:{C_RESET} {C_GREEN}{revisoes_totais}{C_RESET}   |   {C_BOLD}Limite Diário:{C_RESET} {C_GREEN}{limite_str}{C_RESET}")
-        print_divider()
-        
-        print(f"  [{C_CYAN}1{C_RESET}] 📋 Ver Revisões Pendentes para Hoje")
-        print(f"  [{C_CYAN}2{C_RESET}] 📚 Ver Todas as Revisões Cadastradas")
-        print(f"  [{C_CYAN}3{C_RESET}] ➕ Adicionar Nova Revisão")
-        print(f"  [{C_CYAN}4{C_RESET}] ✏️  Editar Revisão Existente")
-        print(f"  [{C_CYAN}5{C_RESET}] ❌ Remover Revisão")
-        print(f"  [{C_CYAN}6{C_RESET}] ✅ Marcar Revisão como Concluída (Estudar)")
-        print(f"  [{C_CYAN}7{C_RESET}] ⚙️  Ajustar Limite Diário de Revisões")
-        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        
-        if opcao == "1":
-            ver_revisoes_opcao(dados, apenas_pendentes=True)
-        elif opcao == "2":
-            ver_revisoes_opcao(dados, apenas_pendentes=False)
-        elif opcao == "3":
-            adicionar_revisao(dados)
-        elif opcao == "4":
-            editar_revisao(dados)
-        elif opcao == "5":
-            remover_revisao(dados)
-        elif opcao == "6":
-            concluir_revisao(dados)
-        elif opcao == "7":
-            alterar_limite_revisoes(dados)
-        elif opcao == "0":
+        except KeyboardInterrupt:
             break
-        else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 7.{C_RESET}")
-            input("\nPressione Enter para tentar novamente...")

@@ -49,7 +49,8 @@ def exibir_ciclo(dados, pausar=True):
         return
 
     print(f"  {C_BOLD}Ciclo iniciado em:{C_RESET} {C_GREEN}{data_inicio}{C_RESET}")
-    print(f"  {C_BOLD}Total de Horas do Ciclo:{C_RESET} {C_GREEN}{horas_totais}h{C_RESET}")
+    horas_totais_formatado = formatar_horas_minutos(horas_totais)
+    print(f"  {C_BOLD}Total de Horas do Ciclo:{C_RESET} {C_GREEN}{horas_totais_formatado}{C_RESET}")
     
     # Divisor da largura exata da tabela
     print(C_CYAN + "─" * largura_tabela + C_RESET)
@@ -131,7 +132,9 @@ def exibir_ciclo(dados, pausar=True):
     # Progresso Geral do Ciclo
     total_estudado = sum(progresso.values())
     pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0
-    print(f"\n{C_BOLD}Progresso Geral do Ciclo:{C_RESET} {C_GREEN}{total_estudado:.1f}h / {horas_totais}h ({pct_concluido:.1f}% concluído){C_RESET}")
+    total_estudado_f = formatar_horas_minutos(total_estudado)
+    horas_totais_f = formatar_horas_minutos(horas_totais)
+    print(f"\n{C_BOLD}Progresso Geral do Ciclo:{C_RESET} {C_GREEN}{total_estudado_f} / {horas_totais_f} ({pct_concluido:.1f}% concluído){C_RESET}")
     print(f"{C_BOLD}Fator de Relevância Total:{C_RESET} {fator_total:.1f}")
     
     if pausar:
@@ -699,129 +702,142 @@ def exibir_historico_sessoes(dados):
     materia_filtro = None
     
     while True:
-        clear_screen()
-        sessoes = dados.get("historico_sessoes", [])
-        
-        titulo = "HISTÓRICO DETALHADO DE SESSÕES (LOGS)"
-        if materia_filtro:
-            titulo += f" - {materia_filtro.upper()}"
-        print_header(titulo)
-        
-        # Filtra sessões guardando os índices originais
-        sessoes_filtradas_com_index = []
-        for idx, s in enumerate(sessoes):
-            if not materia_filtro or s.get("materia", "").lower() == materia_filtro.lower():
-                sessoes_filtradas_com_index.append((idx, s))
-            
-        if not sessoes_filtradas_com_index:
-            print(f"\n{C_YELLOW}⚠ Nenhuma sessão de estudo registrada.{C_RESET}")
-            if materia_filtro:
-                print(f"Nenhum registro encontrado para a matéria '{materia_filtro}'.")
-        else:
-            # Mostra as mais antigas primeiro (ordem cronológica), numerando de K a 1 de cima para baixo
-            # para que o mais recente (embaixo) tenha o número 1
-            K = len(sessoes_filtradas_com_index)
-            for idx_filtro, (original_idx, s) in enumerate(sessoes_filtradas_com_index):
-                i = K - idx_filtro
-                data_hora = s.get("data", "N/A")
-                materia = s.get("materia", "N/A")
-                horas = s.get("horas", 0.0)
-                tipo = s.get("tipo", "registro")
-                obs = s.get("obs", "")
-                editado_em = s.get("editado_em", None)
-                
-                tempo_f = formatar_horas_minutos(horas)
-                
-                if tipo == "ajuste":
-                    msg = f"Ajustou o progresso acumulado para {C_GREEN}{tempo_f}{C_RESET}."
-                else:
-                    msg = f"Estudou por {C_GREEN}{tempo_f}{C_RESET}."
-                
-                print(f"  [{C_CYAN}{i}{C_RESET}] 📅 Realizado em: {C_BOLD}{data_hora}{C_RESET}")
-                if editado_em:
-                    print(f"      ✏️ Editado em:   {C_YELLOW}{editado_em}{C_RESET}")
-                print(f"      📚 Matéria:      {C_CYAN}{materia}{C_RESET}")
-                print(f"      💬 Ação:         {msg}")
-                if obs:
-                    print(f"      📝 Obs:          {C_YELLOW}{obs}{C_RESET}")
-                print_divider()
-                
-        print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Novo Registro de Estudo")
-        if sessoes_filtradas_com_index:
-            print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Registro de Estudo")
-            print(f"  [{C_CYAN}3{C_RESET}] ❌ Excluir Registro de Estudo")
-        print(f"  [{C_CYAN}F{C_RESET}] Filtrar por Matéria")
-        if materia_filtro:
-            print(f"  [{C_CYAN}T{C_RESET}] Remover Filtro (Mostrar Todas)")
-        print(f"  [{C_CYAN}L{C_RESET}] Limpar Histórico de Sessões")
-        print(f"  [{C_CYAN}0{C_RESET}] Voltar ao Menu de Históricos")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip().upper()
-        if not opcao or opcao == "0":
-            break
-        elif opcao == "1":
-            adicionar_sessao_estudo_manual(dados)
-        elif opcao == "2" and sessoes_filtradas_com_index:
-            editar_sessao_estudo(dados, sessoes_filtradas_com_index)
-        elif opcao == "3" and sessoes_filtradas_com_index:
-            excluir_sessao_estudo(dados, sessoes_filtradas_com_index)
-        elif opcao == "F":
-            materias = dados.get("materias", [])
-            if not materias:
-                print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada para filtrar.{C_RESET}")
-                input("\nPressione Enter para continuar...")
-                continue
-                
+        try:
             clear_screen()
-            print_header("FILTRAR POR MATÉRIA")
-            for i, m in enumerate(materias, start=1):
-                print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']}")
-            print_divider()
-            opcao_m = obter_input_float("Escolha o número da matéria (ou 0 para cancelar): ", min_val=0, max_val=len(materias))
-            if opcao_m > 0:
-                materia_filtro = materias[int(opcao_m) - 1]["nome"]
-        elif opcao == "T":
-            materia_filtro = None
-        elif opcao == "L":
-            confirmar = obter_input_str("Deseja realmente apagar TODO o histórico de sessões? (S/N): ").upper()
-            if confirmar == "S":
-                confirmar2 = obter_input_str("Digite 'CONFIRMAR' para prosseguir com a exclusão definitiva: ").upper()
-                if confirmar2 == "CONFIRMAR":
-                    dados["historico_sessoes"] = []
-                    from database import recalcular_progresso_atual
-                    recalcular_progresso_atual(dados)
-                    salvar_dados(dados)
-                    print(f"\n{C_GREEN}✔ Histórico de sessões apagado com sucesso!{C_RESET}")
-                    input("\nPressione Enter para continuar...")
-                else:
-                    print(f"\n{C_YELLOW}Ação cancelada (confirmação inválida).{C_RESET}")
-                    input("\nPressione Enter para continuar...")
+            sessoes = dados.get("historico_sessoes", [])
+            
+            titulo = "HISTÓRICO DETALHADO DE SESSÕES (LOGS)"
+            if materia_filtro:
+                titulo += f" - {materia_filtro.upper()}"
+            print_header(titulo)
+            
+            # Filtra sessões guardando os índices originais
+            sessoes_filtradas_com_index = []
+            for idx, s in enumerate(sessoes):
+                if not materia_filtro or s.get("materia", "").lower() == materia_filtro.lower():
+                    sessoes_filtradas_com_index.append((idx, s))
+                
+            if not sessoes_filtradas_com_index:
+                print(f"\n{C_YELLOW}⚠ Nenhuma sessão de estudo registrada.{C_RESET}")
+                if materia_filtro:
+                    print(f"Nenhum registro encontrado para a matéria '{materia_filtro}'.")
             else:
-                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
-                input("\nPressione Enter para continuar...")
+                # Mostra as mais antigas primeiro (ordem cronológica), numerando de K a 1 de cima para baixo
+                # para que o mais recente (embaixo) tenha o número 1
+                K = len(sessoes_filtradas_com_index)
+                for idx_filtro, (original_idx, s) in enumerate(sessoes_filtradas_com_index):
+                    i = K - idx_filtro
+                    data_hora = s.get("data", "N/A")
+                    materia = s.get("materia", "N/A")
+                    horas = s.get("horas", 0.0)
+                    tipo = s.get("tipo", "registro")
+                    obs = s.get("obs", "")
+                    editado_em = s.get("editado_em", None)
+                    
+                    tempo_f = formatar_horas_minutos(horas)
+                    
+                    if tipo == "ajuste":
+                        msg = f"Ajustou o progresso acumulado para {C_GREEN}{tempo_f}{C_RESET}."
+                    else:
+                        msg = f"Estudou por {C_GREEN}{tempo_f}{C_RESET}."
+                    
+                    print(f"  [{C_CYAN}{i}{C_RESET}] 📅 Realizado em: {C_BOLD}{data_hora}{C_RESET}")
+                    if editado_em:
+                        print(f"      ✏️ Editado em:   {C_YELLOW}{editado_em}{C_RESET}")
+                    print(f"      📚 Matéria:      {C_CYAN}{materia}{C_RESET}")
+                    print(f"      💬 Ação:         {msg}")
+                    if obs:
+                        print(f"      📝 Obs:          {C_YELLOW}{obs}{C_RESET}")
+                    print_divider()
+                    
+            print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Novo Registro de Estudo")
+            if sessoes_filtradas_com_index:
+                print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Registro de Estudo")
+                print(f"  [{C_CYAN}3{C_RESET}] ❌ Excluir Registro de Estudo")
+            print(f"  [{C_CYAN}F{C_RESET}] Filtrar por Matéria")
+            if materia_filtro:
+                print(f"  [{C_CYAN}T{C_RESET}] Remover Filtro (Mostrar Todas)")
+            print(f"  [{C_CYAN}L{C_RESET}] Limpar Histórico de Sessões")
+            print(f"  [{C_CYAN}0{C_RESET}] Voltar ao Menu de Históricos")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip().upper()
+            
+            try:
+                if not opcao or opcao == "0":
+                    break
+                elif opcao == "1":
+                    adicionar_sessao_estudo_manual(dados)
+                elif opcao == "2" and sessoes_filtradas_com_index:
+                    editar_sessao_estudo(dados, sessoes_filtradas_com_index)
+                elif opcao == "3" and sessoes_filtradas_com_index:
+                    excluir_sessao_estudo(dados, sessoes_filtradas_com_index)
+                elif opcao == "F":
+                    materias = dados.get("materias", [])
+                    if not materias:
+                        print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada para filtrar.{C_RESET}")
+                        input("\nPressione Enter para continuar...")
+                        continue
+                        
+                    clear_screen()
+                    print_header("FILTRAR POR MATÉRIA")
+                    for i, m in enumerate(materias, start=1):
+                        print(f"  [{C_CYAN}{i}{C_RESET}] {m['nome']}")
+                    print_divider()
+                    opcao_m = obter_input_float("Escolha o número da matéria (ou 0 para cancelar): ", min_val=0, max_val=len(materias))
+                    if opcao_m > 0:
+                        materia_filtro = materias[int(opcao_m) - 1]["nome"]
+                elif opcao == "T":
+                    materia_filtro = None
+                elif opcao == "L":
+                    confirmar = obter_input_str("Deseja realmente apagar TODO o histórico de sessões? (S/N): ").upper()
+                    if confirmar == "S":
+                        confirmar2 = obter_input_str("Digite 'CONFIRMAR' para prosseguir com a exclusão definitiva: ").upper()
+                        if confirmar2 == "CONFIRMAR":
+                            dados["historico_sessoes"] = []
+                            from database import recalcular_progresso_atual
+                            recalcular_progresso_atual(dados)
+                            salvar_dados(dados)
+                            print(f"\n{C_GREEN}✔ Histórico de sessões apagado com sucesso!{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                        else:
+                            print(f"\n{C_YELLOW}Ação cancelada (confirmação inválida).{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                    else:
+                        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+                        input("\nPressione Enter para continuar...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
+            break
 
 def exibir_historico(dados):
     """Submenu para exibir históricos do ciclo e sessões de estudo."""
     while True:
-        clear_screen()
-        print_header("HISTÓRICOS DE ESTUDOS")
-        
-        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Histórico de Ciclos Completados")
-        print(f"  [{C_CYAN}2{C_RESET}] 📝 Ver Histórico Detalhado de Sessões (Logs)")
-        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        if opcao == "1":
-            exibir_historico_ciclos(dados)
-        elif opcao == "2":
-            exibir_historico_sessoes(dados)
-        elif opcao == "0":
+        try:
+            clear_screen()
+            print_header("HISTÓRICOS DE ESTUDOS")
+            
+            print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Histórico de Ciclos Completados")
+            print(f"  [{C_CYAN}2{C_RESET}] 📝 Ver Histórico Detalhado de Sessões (Logs)")
+            print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            try:
+                if opcao == "1":
+                    exibir_historico_ciclos(dados)
+                elif opcao == "2":
+                    exibir_historico_sessoes(dados)
+                elif opcao == "0":
+                    break
+                else:
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 2.{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
             break
-        else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 2.{C_RESET}")
-            input("\nPressione Enter para tentar novamente...")
 
 def configuracao_inicial(dados):
     """Guia o usuário na primeira configuração estratégica de estudos."""
@@ -856,64 +872,78 @@ def configuracao_inicial(dados):
 def menu_ciclo_progresso(dados):
     """Submenu para gerenciar o ciclo de estudos e progresso."""
     while True:
-        clear_screen()
-        print_header("CICLO DE ESTUDOS & PROGRESSO")
-        
-        horas = dados.get("horas_semanais", 0.0)
-        total_estudado = sum(dados.get("progresso_atual", {}).values())
-        print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{horas}h{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{total_estudado:.1f}h{C_RESET}")
-        print_divider()
-        
-        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")
-        print(f"  [{C_CYAN}2{C_RESET}] 📝 Registrar Progresso de Estudos")
-        print(f"  [{C_CYAN}3{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
-        print(f"  [{C_CYAN}4{C_RESET}] ⏱️  Alterar Horas Semanais")
-        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        if opcao == "1":
-            exibir_ciclo(dados, pausar=True)
-        elif opcao == "2":
-            registrar_progresso(dados)
-        elif opcao == "3":
-            ajustar_progresso(dados)
-        elif opcao == "4":
-            alterar_horas(dados)
-        elif opcao == "0":
+        try:
+            clear_screen()
+            print_header("CICLO DE ESTUDOS & PROGRESSO")
+            
+            horas = dados.get("horas_semanais", 0.0)
+            total_estudado = sum(dados.get("progresso_atual", {}).values())
+            carga_formatada = formatar_horas_minutos(horas)
+            estudado_formatado = formatar_horas_minutos(total_estudado)
+            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET}")
+            print_divider()
+            
+            print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")
+            print(f"  [{C_CYAN}2{C_RESET}] 📝 Registrar Progresso de Estudos")
+            print(f"  [{C_CYAN}3{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
+            print(f"  [{C_CYAN}4{C_RESET}] ⏱️  Alterar Horas Semanais")
+            print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            try:
+                if opcao == "1":
+                    exibir_ciclo(dados, pausar=True)
+                elif opcao == "2":
+                    registrar_progresso(dados)
+                elif opcao == "3":
+                    ajustar_progresso(dados)
+                elif opcao == "4":
+                    alterar_horas(dados)
+                elif opcao == "0":
+                    break
+                else:
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
             break
-        else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
-            input("\nPressione Enter para tentar novamente...")
 
 def menu_materias(dados):
     """Submenu para gerenciamento de matérias."""
     while True:
-        clear_screen()
-        print_header("GERENCIAR MATÉRIAS")
-        
-        num_materias = len(dados.get("materias", []))
-        print(f"  {C_BOLD}Matérias Cadastradas:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
-        print_divider()
-        
-        print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Nova Matéria")
-        print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Matéria Existente")
-        print(f"  [{C_CYAN}3{C_RESET}] ❌ Remover Matéria")
-        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        if opcao == "1":
-            adicionar_materia(dados)
-        elif opcao == "2":
-            editar_materia(dados)
-        elif opcao == "3":
-            remover_materia(dados)
-        elif opcao == "0":
+        try:
+            clear_screen()
+            print_header("GERENCIAR MATÉRIAS")
+            
+            num_materias = len(dados.get("materias", []))
+            print(f"  {C_BOLD}Matérias Cadastradas:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
+            print_divider()
+            
+            print(f"  [{C_CYAN}1{C_RESET}] ➕ Adicionar Nova Matéria")
+            print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Matéria Existente")
+            print(f"  [{C_CYAN}3{C_RESET}] ❌ Remover Matéria")
+            print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            try:
+                if opcao == "1":
+                    adicionar_materia(dados)
+                elif opcao == "2":
+                    editar_materia(dados)
+                elif opcao == "3":
+                    remover_materia(dados)
+                elif opcao == "0":
+                    break
+                else:
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 3.{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
             break
-        else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 3.{C_RESET}")
-            input("\nPressione Enter para tentar novamente...")
 
 def verificar_atualizacao(dados):
     """Verifica se há atualizações do script no GitHub e atualiza via git pull."""

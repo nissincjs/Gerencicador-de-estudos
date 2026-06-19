@@ -4,7 +4,7 @@ from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, DB_FILE
 )
 from utils import (
-    clear_screen, print_header, print_divider
+    clear_screen, print_header, print_divider, formatar_horas_minutos
 )
 from database import carregar_dados, salvar_local, sincronizar_pendencias
 from actions import (
@@ -216,56 +216,68 @@ def main():
         configuracao_inicial(dados)
         
     while True:
-        clear_screen()
-        print_header("MENU PRINCIPAL - CICLO DE ESTUDOS ESTRATÉGICO")
-        
-        horas = dados.get("horas_semanais", 0.0)
-        num_materias = len(dados.get("materias", []))
-        total_estudado = sum(dados.get("progresso_atual", {}).values())
-        
-        print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{horas}h{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{total_estudado:.1f}h{C_RESET}   |   {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
-        print_divider()
-        
-        print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
-        print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
-        print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
-        print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
-        print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
-        print(f"  [{C_CYAN}6{C_RESET}] 🤝 Parceiro de Estudos")
-        print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar / Alternar Conta")
-        print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        
-        if opcao == "1":
-            menu_ciclo_progresso(dados)
-        elif opcao == "2":
-            menu_materias(dados)
-        elif opcao == "3":
-            menu_revisoes(dados)
-        elif opcao == "4":
-            exibir_historico(dados)
-        elif opcao == "5":
-            verificar_atualizacao(dados)
-        elif opcao == "6":
-            partner_menu.menu_parceria(dados)
-        elif opcao == "9":
+        try:
             clear_screen()
-            print_header("DESCONECTANDO")
-            supabase_client.limpar_sessao()
-            print(f"\n{C_GREEN}Você foi deslogado com sucesso!{C_RESET}")
-            input("\nPressione Enter para sair...")
-            break
-        elif opcao == "0":
+            print_header("MENU PRINCIPAL - CICLO DE ESTUDOS ESTRATÉGICO")
+            
+            horas = dados.get("horas_semanais", 0.0)
+            num_materias = len(dados.get("materias", []))
+            total_estudado = sum(dados.get("progresso_atual", {}).values())
+            
+            carga_formatada = formatar_horas_minutos(horas)
+            estudado_formatado = formatar_horas_minutos(total_estudado)
+            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET}   |   {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
+            print_divider()
+            
+            print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
+            print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
+            print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
+            print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
+            print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
+            print(f"  [{C_CYAN}6{C_RESET}] 🤝 Parceiro de Estudos")
+            print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar / Alternar Conta")
+            print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            
+            try:
+                if opcao == "1":
+                    menu_ciclo_progresso(dados)
+                elif opcao == "2":
+                    menu_materias(dados)
+                elif opcao == "3":
+                    menu_revisoes(dados)
+                elif opcao == "4":
+                    exibir_historico(dados)
+                elif opcao == "5":
+                    verificar_atualizacao(dados)
+                elif opcao == "6":
+                    partner_menu.menu_parceria(dados)
+                elif opcao == "9":
+                    clear_screen()
+                    print_header("DESCONECTANDO")
+                    supabase_client.limpar_sessao()
+                    print(f"\n{C_GREEN}Você foi deslogado com sucesso!{C_RESET}")
+                    input("\nPressione Enter para sair...")
+                    break
+                elif opcao == "0":
+                    clear_screen()
+                    print_header("ATÉ LOGO!")
+                    print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
+                    print("Mantenha o foco e bons estudos! 📚🚀\n")
+                    break
+                else:
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-6 ou 9.{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
             clear_screen()
             print_header("ATÉ LOGO!")
             print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
             print("Mantenha o foco e bons estudos! 📚🚀\n")
             break
-        else:
-            print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-6 ou 9.{C_RESET}")
-            input("\nPressione Enter para tentar novamente...")
 
 if __name__ == "__main__":
     main()

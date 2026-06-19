@@ -230,6 +230,90 @@ def exibir_calendario_consistencia(dados):
         
     print(f"\n  {C_BOLD}Legenda:{C_RESET} 🟩 Estudou | 🟥 Não Estudou | 🟨 Justificado | ⬜ Futuro")
 
+def visualizar_logs_dia_parceiro(dados_parceiro):
+    """Permite ao usuário visualizar os logs de estudo do parceiro para um dia específico."""
+    while True:
+        clear_screen()
+        print_header("LOGS DE ESTUDO DO PARCEIRO POR DATA")
+        
+        ontem_str = (date.today() - timedelta(days=1)).strftime("%d/%m/%Y")
+        print(f"Digite a data no formato {C_YELLOW}DD/MM/AAAA{C_RESET} (ou {C_CYAN}0{C_RESET} para voltar).")
+        print(f"Exemplo: {ontem_str}\n")
+        
+        data_input = input(f"Data [{ontem_str}]: ").strip()
+        if data_input == "0":
+            break
+        if not data_input:
+            data_input = ontem_str
+            
+        try:
+            datetime.strptime(data_input, "%d/%m/%Y")
+        except ValueError:
+            print(f"\n{C_RED}Erro: Data inválida! Use o formato DD/MM/AAAA.{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+            continue
+            
+        sessoes = dados_parceiro.get("historico_sessoes", [])
+        sessoes_do_dia = []
+        for s in sessoes:
+            data_s = s.get("data", "")
+            if not data_s:
+                continue
+            dia_s = data_s.split()[0]
+            if dia_s == data_input:
+                sessoes_do_dia.append(s)
+                
+        clear_screen()
+        print_header(f"LOGS DO PARCEIRO EM {data_input}")
+        
+        if not sessoes_do_dia:
+            print(f"\n{C_YELLOW}⚠ Nenhum registro de estudo ou ajuste encontrado para o dia {data_input}.{C_RESET}")
+        else:
+            def obter_horario(s):
+                data_s = s.get("data", "")
+                try:
+                    return datetime.strptime(data_s, "%d/%m/%Y %H:%M:%S")
+                except Exception:
+                    return datetime.min
+                    
+            sessoes_do_dia_ordenadas = sorted(sessoes_do_dia, key=obter_horario)
+            
+            total_horas = 0.0
+            for idx, s in enumerate(sessoes_do_dia_ordenadas, start=1):
+                data_s = s.get("data", "")
+                horario = "N/A"
+                if len(data_s.split()) > 1:
+                    horario = data_s.split()[1]
+                    
+                materia = s.get("materia", "N/A")
+                horas = s.get("horas", 0.0)
+                tipo = s.get("tipo", "registro")
+                obs = s.get("obs", "")
+                editado_em = s.get("editado_em", None)
+                
+                tempo_f = formatar_horas_minutos(horas)
+                
+                if tipo == "ajuste":
+                    msg = f"Ajustou o progresso acumulado para {C_GREEN}{tempo_f}{C_RESET}."
+                else:
+                    msg = f"Estudou por {C_GREEN}{tempo_f}{C_RESET}."
+                    
+                print(f"  📅 Horário: {C_BOLD}{horario}{C_RESET}")
+                if editado_em:
+                    print(f"      ✏️ Editado em:   {C_YELLOW}{editado_em}{C_RESET}")
+                print(f"      📚 Matéria:      {C_CYAN}{materia}{C_RESET}")
+                print(f"      💬 Ação:         {msg}")
+                if obs:
+                    print(f"      📝 Obs:          {C_YELLOW}{obs}{C_RESET}")
+                print_divider()
+                
+            # Calcula o tempo total real estudado no dia considerando os deltas (e ajustes)
+            estudos_do_dia_dict = calcular_estudos_por_dia(dados_parceiro).get(data_input, {})
+            total_horas = max(0.0, sum(estudos_do_dia_dict.values()))
+            print(f"\n  {C_BOLD}Total de Estudo Focado no Dia:{C_RESET} {C_GREEN}{formatar_horas_minutos(total_horas)}{C_RESET}")
+            
+        input("\nPressione Enter para voltar à consulta por data...")
+
 def exibir_status_parceiro(perfil_parceiro):
     """Exibe o painel de métricas de estudo do parceiro."""
     clear_screen()
@@ -244,38 +328,50 @@ def exibir_status_parceiro(perfil_parceiro):
         input("\nPressione Enter para voltar...")
         return
         
-    estudos_hoje = obter_estudos_hoje(dados_parceiro)
-    streak = calcular_streak(dados_parceiro)
-    metas = obter_metas_semana(dados_parceiro)
-    justificativas = dados_parceiro.get("justificativas", [])
-    
-    print_divider()
-    print(f"  {C_BOLD}Status Hoje:{C_RESET}", end=" ")
-    if estudos_hoje["estudou"]:
-        print(f"{C_GREEN}ESTUDOU! 📚{C_RESET}")
-        print(f"  • Tempo Estudado: {C_GREEN}{formatar_horas_minutos(estudos_hoje['total_horas'])}{C_RESET}")
-        print(f"  • Matérias: {C_CYAN}{', '.join(estudos_hoje['materias'])}{C_RESET}")
-    else:
-        print(f"{C_RED}Ainda não registrou estudos hoje ⏳{C_RESET}")
+    while True:
+        clear_screen()
+        print_header(f"ACOMPANHAMENTO: {perfil_parceiro['email'].upper()}")
         
-    print(f"\n  {C_BOLD}Sequência de Consistência:{C_RESET} {C_GREEN}{streak} dias seguidos{C_RESET} 🔥")
-    print(f"  {C_BOLD}Metas da Semana:{C_RESET} {C_GREEN}{metas['cumpridas']}/{metas['total']}{C_RESET} matérias concluídas 🎯")
-    
-    print_divider()
-    # Exibe o calendário de consistência
-    exibir_calendario_consistencia(dados_parceiro)
-    
-    print_divider()
-    print(f"  {C_BOLD}Justificativas de Ausência:{C_RESET}")
-    if not justificativas:
-        print("    Nenhuma justificativa registrada.")
-    else:
-        for j in reversed(justificativas[-5:]):  # Mostra as últimas 5
-            editado_str = f" (Editado em {j['editado_em']})" if j.get("editado_em") else ""
-            print(f"    • {C_YELLOW}{j.get('data')}{C_RESET}: {j.get('motivo')}{C_YELLOW}{editado_str}{C_RESET}")
+        estudos_hoje = obter_estudos_hoje(dados_parceiro)
+        streak = calcular_streak(dados_parceiro)
+        metas = obter_metas_semana(dados_parceiro)
+        justificativas = dados_parceiro.get("justificativas", [])
+        
+        print_divider()
+        print(f"  {C_BOLD}Status Hoje:{C_RESET}", end=" ")
+        if estudos_hoje["estudou"]:
+            print(f"{C_GREEN}ESTUDOU! 📚{C_RESET}")
+            print(f"  • Tempo Estudado: {C_GREEN}{formatar_horas_minutos(estudos_hoje['total_horas'])}{C_RESET}")
+            print(f"  • Matérias: {C_CYAN}{', '.join(estudos_hoje['materias'])}{C_RESET}")
+        else:
+            print(f"{C_RED}Ainda não registrou estudos hoje ⏳{C_RESET}")
             
-    print_divider()
-    input("\nPressione Enter para voltar...")
+        print(f"\n  {C_BOLD}Sequência de Consistência:{C_RESET} {C_GREEN}{streak} dias seguidos{C_RESET} 🔥")
+        print(f"  {C_BOLD}Metas da Semana:{C_RESET} {C_GREEN}{metas['cumpridas']}/{metas['total']}{C_RESET} matérias concluídas 🎯")
+        
+        print_divider()
+        # Exibe o calendário de consistência
+        exibir_calendario_consistencia(dados_parceiro)
+        
+        print_divider()
+        print(f"  {C_BOLD}Justificativas de Ausência:{C_RESET}")
+        if not justificativas:
+            print("    Nenhuma justificativa registrada.")
+        else:
+            for j in reversed(justificativas[-5:]):  # Mostra as últimas 5
+                editado_str = f" (Editado em {j['editado_em']})" if j.get("editado_em") else ""
+                print(f"    • {C_YELLOW}{j.get('data')}{C_RESET}: {j.get('motivo')}{C_YELLOW}{editado_str}{C_RESET}")
+                
+        print_divider()
+        print(f"  [{C_CYAN}1{C_RESET}] 📝 Visualizar Logs Detalhados de um Dia Específico")
+        print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+        print_divider()
+        
+        opcao = input("Escolha uma opção: ").strip()
+        if opcao == "1":
+            visualizar_logs_dia_parceiro(dados_parceiro)
+        elif opcao == "0" or not opcao:
+            break
 
 def registrar_justificativa_propria(dados):
     """Permite ao usuário justificar um dia que não estudou."""
@@ -402,126 +498,144 @@ def excluir_justificativa_propria(dados):
 def menu_justificativas(dados):
     """Menu CRUD para gerenciamento de justificativas de ausência."""
     while True:
-        clear_screen()
-        print_header("GERENCIAR JUSTIFICATIVAS DE AUSÊNCIA")
-        
-        justificativas = dados.get("justificativas", [])
-        
-        if not justificativas:
-            print(f"\n{C_YELLOW}⚠ Nenhuma justificativa cadastrada.{C_RESET}\n")
-        else:
-            for i, j in enumerate(justificativas, start=1):
-                editado_str = f" (Editado em: {j['editado_em']})" if j.get("editado_em") else ""
-                print(f"  [{C_CYAN}{i}{C_RESET}] 📅 {C_BOLD}{j.get('data')}{C_RESET} - {j.get('motivo')}{C_YELLOW}{editado_str}{C_RESET}")
-                print(f"      Criado em: {j.get('registrado_em', 'N/A')}")
-                print_divider()
-                
-        print(f"  [{C_CYAN}1{C_RESET}] ➕ Registrar Nova Justificativa")
-        if justificativas:
-            print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Justificativa")
-            print(f"  [{C_CYAN}3{C_RESET}] ❌ Excluir Justificativa")
-        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar")
-        print_divider()
-        
-        opcao = input("Escolha uma opção: ").strip()
-        if opcao == "1":
-            registrar_justificativa_propria(dados)
-        elif opcao == "2" and justificativas:
-            editar_justificativa_propria(dados)
-        elif opcao == "3" and justificativas:
-            excluir_justificativa_propria(dados)
-        elif opcao == "0":
+        try:
+            clear_screen()
+            print_header("GERENCIAR JUSTIFICATIVAS DE AUSÊNCIA")
+            
+            justificativas = dados.get("justificativas", [])
+            
+            if not justificativas:
+                print(f"\n{C_YELLOW}⚠ Nenhuma justificativa cadastrada.{C_RESET}\n")
+            else:
+                for i, j in enumerate(justificativas, start=1):
+                    editado_str = f" (Editado em: {j['editado_em']})" if j.get("editado_em") else ""
+                    print(f"  [{C_CYAN}{i}{C_RESET}] 📅 {C_BOLD}{j.get('data')}{C_RESET} - {j.get('motivo')}{C_YELLOW}{editado_str}{C_RESET}")
+                    print(f"      Criado em: {j.get('registrado_em', 'N/A')}")
+                    print_divider()
+                    
+            print(f"  [{C_CYAN}1{C_RESET}] ➕ Registrar Nova Justificativa")
+            if justificativas:
+                print(f"  [{C_CYAN}2{C_RESET}] ✏️  Editar Justificativa")
+                print(f"  [{C_CYAN}3{C_RESET}] ❌ Excluir Justificativa")
+            print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar")
+            print_divider()
+            
+            opcao = input("Escolha uma opção: ").strip()
+            try:
+                if opcao == "1":
+                    registrar_justificativa_propria(dados)
+                elif opcao == "2" and justificativas:
+                    editar_justificativa_propria(dados)
+                elif opcao == "3" and justificativas:
+                    excluir_justificativa_propria(dados)
+                elif opcao == "0":
+                    break
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
             break
 
 def menu_parceria(dados):
     """Menu principal do sistema de parceiros."""
     while True:
-        clear_screen()
-        print_header("PARCEIRO DE ESTUDOS (RESPONSABILIDADE MÚTUA)")
-        
-        # Busca o perfil do usuário logado
-        perfil = supabase_client.obter_perfil()
-        if not perfil:
-            print(f"\n{C_RED}Não foi possível carregar seu perfil. Verifique sua conexão.{C_RESET}")
-            input("\nPressione Enter para voltar...")
-            return
+        try:
+            clear_screen()
+            print_header("PARCEIRO DE ESTUDOS (RESPONSABILIDADE MÚTUA)")
             
-        parceiro_id = perfil.get("parceiro_id")
-        
-        if not parceiro_id:
-            # Sem parceiro vinculado
-            print(f"  Seu código de convite: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}")
-            print("  Compartilhe este código com seu parceiro de estudos para se vincularem!\n")
-            print(f"  [{C_CYAN}1{C_RESET}] 🤝 Vincular Parceiro (Inserir código)")
-            print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
-            print_divider()
+            # Busca o perfil do usuário logado
+            perfil = supabase_client.obter_perfil()
+            if not perfil:
+                print(f"\n{C_RED}Não foi possível carregar seu perfil. Verifique sua conexão.{C_RESET}")
+                input("\nPressione Enter para voltar...")
+                return
+                
+            parceiro_id = perfil.get("parceiro_id")
             
-            opcao = input("Escolha uma opção: ").strip()
-            if opcao == "1":
-                codigo = input("\nDigite o código de convite do seu parceiro (ex: ST-XXXXXX): ").strip()
-                if not codigo:
-                    continue
-                print(f"\n{C_YELLOW}Tentando estabelecer vínculo...{C_RESET}")
+            if not parceiro_id:
+                # Sem parceiro vinculado
+                print(f"  Seu código de convite: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}")
+                print("  Compartilhe este código com seu parceiro de estudos para se vincularem!\n")
+                print(f"  [{C_CYAN}1{C_RESET}] 🤝 Vincular Parceiro (Inserir código)")
+                print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+                print_divider()
+                
+                opcao = input("Escolha uma opção: ").strip()
                 try:
-                    supabase_client.vincular_parceiro(codigo)
-                    print(f"\n{C_GREEN}✔ Vínculo realizado com sucesso! Bons estudos em equipe!{C_RESET}")
-                except Exception as e:
-                    print(f"\n{C_RED}Erro ao vincular: {e}{C_RESET}")
-                input("\nPressione Enter para continuar...")
-            elif opcao == "0":
-                break
-        else:
-            # Com parceiro vinculado (pode estar pendente de confirmação mútua)
-            perfil_parceiro = supabase_client.obter_perfil_por_id(parceiro_id)
-            eh_mutuo = perfil_parceiro and perfil_parceiro.get("parceiro_id") == perfil.get("user_id")
-            
-            if eh_mutuo:
-                parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
-                
-                print(f"  Parceiro vinculado: {C_GREEN}{parceiro_email}{C_RESET}\n")
-                print(f"  [{C_CYAN}1{C_RESET}] 📊 Acompanhar Consistência do Parceiro")
-                print(f"  [{C_CYAN}2{C_RESET}] 📝 Gerenciar Justificativas de Ausência (CRUD)")
-                print(f"  [{C_CYAN}9{C_RESET}] ❌ Desvincular Parceiro de Estudos")
-                print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
-                print_divider()
-                
-                opcao = input("Escolha uma opção: ").strip()
-                if opcao == "1":
-                    if perfil_parceiro:
-                        exibir_status_parceiro(perfil_parceiro)
-                    else:
-                        print(f"\n{C_RED}Erro ao obter perfil do parceiro.{C_RESET}")
+                    if opcao == "1":
+                        codigo = input("\nDigite o código de convite do seu parceiro (ex: ST-XXXXXX): ").strip()
+                        if not codigo:
+                            continue
+                        print(f"\n{C_YELLOW}Tentando estabelecer vínculo...{C_RESET}")
+                        try:
+                            supabase_client.vincular_parceiro(codigo)
+                            print(f"\n{C_GREEN}✔ Vínculo realizado com sucesso! Bons estudos em equipe!{C_RESET}")
+                        except Exception as e:
+                            print(f"\n{C_RED}Erro ao vincular: {e}{C_RESET}")
                         input("\nPressione Enter para continuar...")
-                elif opcao == "2":
-                    menu_justificativas(dados)
-                elif opcao == "9":
-                    confirmar = input(f"\n{C_RED}Deseja realmente remover o vínculo com {parceiro_email}? (S/N): {C_RESET}").strip().upper()
-                    if confirmar == "S":
-                        supabase_client.desvincular_parceiro()
-                        print(f"\n{C_GREEN}Parceiro desvinculado com sucesso.{C_RESET}")
-                    else:
-                        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
-                    input("\nPressione Enter para continuar...")
-                elif opcao == "0":
-                    break
+                    elif opcao == "0":
+                        break
+                except KeyboardInterrupt:
+                    pass
             else:
-                # Vínculo pendente (Usuário atual vinculou o parceiro, mas o parceiro ainda não vinculou de volta)
-                parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
-                print(f"  Solicitação de vínculo enviada para: {C_GREEN}{parceiro_email}{C_RESET}")
-                print(f"  {C_YELLOW}Aguardando que ele insira seu código de convite para ativar o vínculo.{C_RESET}")
-                print(f"  Seu código de convite para passar para ele: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}\n")
-                print(f"  [{C_CYAN}9{C_RESET}] ❌ Cancelar Solicitação de Vínculo")
-                print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
-                print_divider()
+                # Com parceiro vinculado (pode estar pendente de confirmação mútua)
+                perfil_parceiro = supabase_client.obter_perfil_por_id(parceiro_id)
+                eh_mutuo = perfil_parceiro and perfil_parceiro.get("parceiro_id") == perfil.get("user_id")
                 
-                opcao = input("Escolha uma opção: ").strip()
-                if opcao == "9":
-                    confirmar = input(f"\n{C_RED}Deseja realmente cancelar a solicitação para {parceiro_email}? (S/N): {C_RESET}").strip().upper()
-                    if confirmar == "S":
-                        supabase_client.desvincular_parceiro()
-                        print(f"\n{C_GREEN}Solicitação cancelada com sucesso.{C_RESET}")
-                    else:
-                        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
-                    input("\nPressione Enter para continuar...")
-                elif opcao == "0":
-                    break
+                if eh_mutuo:
+                    parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
+                    
+                    print(f"  Parceiro vinculado: {C_GREEN}{parceiro_email}{C_RESET}\n")
+                    print(f"  [{C_CYAN}1{C_RESET}] 📊 Acompanhar Consistência do Parceiro")
+                    print(f"  [{C_CYAN}2{C_RESET}] 📝 Gerenciar Justificativas de Ausência (CRUD)")
+                    print(f"  [{C_CYAN}9{C_RESET}] ❌ Desvincular Parceiro de Estudos")
+                    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+                    print_divider()
+                    
+                    opcao = input("Escolha uma opção: ").strip()
+                    try:
+                        if opcao == "1":
+                            if perfil_parceiro:
+                                exibir_status_parceiro(perfil_parceiro)
+                            else:
+                                print(f"\n{C_RED}Erro ao obter perfil do parceiro.{C_RESET}")
+                                input("\nPressione Enter para continuar...")
+                        elif opcao == "2":
+                            menu_justificativas(dados)
+                        elif opcao == "9":
+                            confirmar = input(f"\n{C_RED}Deseja realmente remover o vínculo com {parceiro_email}? (S/N): {C_RESET}").strip().upper()
+                            if confirmar == "S":
+                                supabase_client.desvincular_parceiro()
+                                print(f"\n{C_GREEN}Parceiro desvinculado com sucesso.{C_RESET}")
+                            else:
+                                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                        elif opcao == "0":
+                            break
+                    except KeyboardInterrupt:
+                        pass
+                else:
+                    # Vínculo pendente (Usuário atual vinculou o parceiro, mas o parceiro ainda não vinculou de volta)
+                    parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
+                    print(f"  Solicitação de vínculo enviada para: {C_GREEN}{parceiro_email}{C_RESET}")
+                    print(f"  {C_YELLOW}Aguardando que ele insira seu código de convite para ativar o vínculo.{C_RESET}")
+                    print(f"  Seu código de convite para passar para ele: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}\n")
+                    print(f"  [{C_CYAN}9{C_RESET}] ❌ Cancelar Solicitação de Vínculo")
+                    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+                    print_divider()
+                    
+                    opcao = input("Escolha uma opção: ").strip()
+                    try:
+                        if opcao == "9":
+                            confirmar = input(f"\n{C_RED}Deseja realmente cancelar a solicitação para {parceiro_email}? (S/N): {C_RESET}").strip().upper()
+                            if confirmar == "S":
+                                supabase_client.desvincular_parceiro()
+                                print(f"\n{C_GREEN}Solicitação cancelada com sucesso.{C_RESET}")
+                            else:
+                                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+                            input("\nPressione Enter para continuar...")
+                        elif opcao == "0":
+                            break
+                    except KeyboardInterrupt:
+                        pass
+        except KeyboardInterrupt:
+            break
