@@ -718,9 +718,11 @@ def exibir_historico_sessoes(dados):
             if materia_filtro:
                 print(f"Nenhum registro encontrado para a matéria '{materia_filtro}'.")
         else:
-            # Mostra as mais recentes primeiro, numerando de 1 a K
+            # Mostra as mais antigas primeiro (ordem cronológica), numerando de K a 1 de cima para baixo
+            # para que o mais recente (embaixo) tenha o número 1
             K = len(sessoes_filtradas_com_index)
-            for i, (original_idx, s) in enumerate(reversed(sessoes_filtradas_com_index), start=1):
+            for idx_filtro, (original_idx, s) in enumerate(sessoes_filtradas_com_index):
+                i = K - idx_filtro
                 data_hora = s.get("data", "N/A")
                 materia = s.get("materia", "N/A")
                 horas = s.get("horas", 0.0)
