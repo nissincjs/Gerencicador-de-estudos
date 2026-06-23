@@ -869,6 +869,238 @@ def configuracao_inicial(dados):
     print(f"\n{C_GREEN}✔ Configuração inicial concluída com sucesso!{C_RESET}")
     input("\nPressione Enter para acessar o Menu Principal...")
 
+def calcular_metricas_acompanhamento(dados):
+    from datetime import datetime, timedelta
+    
+    # 1. Carga horária total do ciclo
+    horas_totais = dados.get("horas_semanais", 0.0)
+    
+    # 2. Total estudado no ciclo atual
+    progresso = dados.get("progresso_atual", {})
+    total_estudado = sum(progresso.values())
+    
+    # 3. Tempo restante no ciclo
+    horas_restantes = max(0.0, horas_totais - total_estudado)
+    
+    # 4. Percentual concluído
+    pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0.0
+    
+    # 5. Dias/tempo decorrido no ciclo atual
+    data_inicio_str = dados.get("data_inicio_ciclo")
+    dt_inicio = None
+    dias_no_ciclo = 0.0
+    if data_inicio_str:
+        try:
+            dt_inicio = datetime.strptime(data_inicio_str, "%d/%m/%Y %H:%M:%S")
+            dias_no_ciclo = (datetime.now() - dt_inicio).total_seconds() / 86400.0
+        except Exception:
+            pass
+            
+    if dias_no_ciclo < 0.0:
+        dias_no_ciclo = 0.0
+        
+    # 6. Médias semanais baseadas no histórico geral de sessões de estudo
+    sessoes = dados.get("historico_sessoes", [])
+    sessoes_registro = [s for s in sessoes if s.get("tipo") == "registro"]
+    total_horas_historico = sum(s.get("horas", 0.0) for s in sessoes_registro)
+    
+    datas = []
+    for s in sessoes_registro:
+        try:
+            dt = datetime.strptime(s["data"], "%d/%m/%Y %H:%M:%S")
+            datas.append(dt)
+        except Exception:
+            pass
+            
+    if datas:
+        dt_primeira = min(datas)
+        dias_desde_inicio = (datetime.now() - dt_primeira).total_seconds() / 86400.0
+        semanas_desde_inicio = max(1.0 / 7.0, dias_desde_inicio / 7.0)
+        media_semanal_historica = total_horas_historico / semanas_desde_inicio
+    else:
+        media_semanal_historica = 0.0
+        dias_desde_inicio = 0.0
+        
+    # 7. Horas nos últimos 7 e 30 dias
+    agora = datetime.now()
+    horas_ultimos_7_dias = 0.0
+    horas_ultimos_30_dias = 0.0
+    for s in sessoes_registro:
+        try:
+            dt = datetime.strptime(s["data"], "%d/%m/%Y %H:%M:%S")
+            dias_atras = (agora - dt).total_seconds() / 86400.0
+            if dias_atras <= 7.0:
+                horas_ultimos_7_dias += s.get("horas", 0.0)
+            if dias_atras <= 30.0:
+                horas_ultimos_30_dias += s.get("horas", 0.0)
+        except Exception:
+            pass
+            
+    if datas:
+        dias_para_divisor_30 = min(30.0, max(1.0, dias_desde_inicio))
+        media_semanal_30_dias = (horas_ultimos_30_dias / dias_para_divisor_30) * 7.0
+    else:
+        media_semanal_30_dias = 0.0
+        
+    # 8. Estimativa de ritmo diário (horas/dia)
+    ritmo_diario_historico = total_horas_historico / max(1.0, dias_desde_inicio) if datas else 0.0
+    
+    if total_estudado > 0.0:
+        if dias_no_ciclo >= 1.0:
+            ritmo_diario = total_estudado / dias_no_ciclo
+            origem_ritmo = "Ciclo Atual"
+        else:
+            if ritmo_diario_historico > 0.0:
+                ritmo_diario = ritmo_diario_historico
+                origem_ritmo = "Média Histórica Geral"
+            else:
+                ritmo_diario = total_estudado / max(0.5, dias_no_ciclo)
+                origem_ritmo = "Ciclo Atual (Estimativa)"
+    else:
+        if ritmo_diario_historico > 0.0:
+            ritmo_diario = ritmo_diario_historico
+            origem_ritmo = "Média Histórica Geral"
+        else:
+            ritmo_diario = 0.0
+            origem_ritmo = "Sem dados de estudo"
+            
+    # Ritmo ideal diário para fechar o ciclo em 7 dias
+    ritmo_ideal_diario = horas_totais / 7.0 if horas_totais > 0 else 0.0
+    
+    # Previsão de conclusão do ciclo
+    if ritmo_diario > 0.0:
+        dias_para_concluir = horas_restantes / ritmo_diario
+        previsao_conclusao = agora + timedelta(days=dias_para_concluir)
+    else:
+        dias_para_concluir = None
+        previsao_conclusao = None
+        
+    return {
+        "horas_totais": horas_totais,
+        "total_estudado": total_estudado,
+        "horas_restantes": horas_restantes,
+        "pct_concluido": pct_concluido,
+        "dias_no_ciclo": dias_no_ciclo,
+        "media_semanal_historica": media_semanal_historica,
+        "horas_ultimos_7_dias": horas_ultimos_7_dias,
+        "media_semanal_30_dias": media_semanal_30_dias,
+        "ritmo_diario": ritmo_diario,
+        "origem_ritmo": origem_ritmo,
+        "ritmo_ideal_diario": ritmo_ideal_diario,
+        "dias_para_concluir": dias_para_concluir,
+        "previsao_conclusao": previsao_conclusao,
+        "dt_inicio": dt_inicio
+    }
+
+def exibir_acompanhamento_ciclo(dados, pausar=True):
+    clear_screen()
+    print_header("PAINEL DE ACOMPANHAMENTO DO CICLO")
+    
+    metricas = calcular_metricas_acompanhamento(dados)
+    
+    # Progresso Geral
+    horas_totais = metricas["horas_totais"]
+    total_estudado = metricas["total_estudado"]
+    horas_restantes = metricas["horas_restantes"]
+    pct_concluido = metricas["pct_concluido"]
+    dias_no_ciclo = metricas["dias_no_ciclo"]
+    
+    # Formatações de horas
+    horas_totais_f = formatar_horas_minutos(horas_totais)
+    total_estudado_f = formatar_horas_minutos(total_estudado)
+    horas_restantes_f = formatar_horas_minutos(horas_restantes)
+    
+    # Barra de Progresso Visual
+    largura_barra = 30
+    preenchido = int((pct_concluido / 100.0) * largura_barra)
+    preenchido = min(largura_barra, max(0, preenchido))
+    vazio = largura_barra - preenchido
+    barra_str = f"[{C_GREEN}{'█' * preenchido}{C_RESET}{'░' * vazio}] {C_BOLD}{pct_concluido:.1f}%{C_RESET}"
+    
+    # Dias no ciclo atual
+    dias_int = int(dias_no_ciclo)
+    horas_int = int((dias_no_ciclo - dias_int) * 24)
+    minutos_int = int(((dias_no_ciclo - dias_int) * 24 - horas_int) * 60)
+    
+    if dias_int > 0:
+        tempo_ciclo_str = f"{dias_int}d {horas_int}h {minutos_int}m"
+    elif horas_int > 0:
+        tempo_ciclo_str = f"{horas_int}h {minutos_int}m"
+    else:
+        tempo_ciclo_str = f"{minutos_int}m (recém-iniciado)"
+        
+    print(f"  {C_BOLD}Progresso Geral do Ciclo Atual:{C_RESET}")
+    print(f"    • Meta Total:      {C_CYAN}{horas_totais_f}{C_RESET}")
+    print(f"    • Total Estudado:  {C_GREEN}{total_estudado_f}{C_RESET}")
+    print(f"    • Tempo Restante:  {C_YELLOW if horas_restantes > 0 else C_GREEN}{horas_restantes_f}{C_RESET}")
+    print(f"    • Barra de Status: {barra_str}")
+    print(f"    • Tempo Decorrido: {C_BOLD}{tempo_ciclo_str}{C_RESET} desde o início")
+    print_divider()
+    
+    # Ritmo e Médias de Estudo
+    media_semanal_historica = metricas["media_semanal_historica"]
+    horas_ultimos_7_dias = metricas["horas_ultimos_7_dias"]
+    media_semanal_30_dias = metricas["media_semanal_30_dias"]
+    ritmo_diario = metricas["ritmo_diario"]
+    origem_ritmo = metricas["origem_ritmo"]
+    ritmo_ideal_diario = metricas["ritmo_ideal_diario"]
+    
+    media_sem_hist_f = formatar_horas_minutos(media_semanal_historica)
+    horas_7_dias_f = formatar_horas_minutos(horas_ultimos_7_dias)
+    media_30_dias_f = formatar_horas_minutos(media_semanal_30_dias)
+    
+    print(f"  {C_BOLD}Histórico de Ritmo & Médias Semanais:{C_RESET}")
+    print(f"    • Horas nesta semana (Últimos 7 dias): {C_GREEN}{horas_7_dias_f}{C_RESET}")
+    print(f"    • Média semanal recente (Últimos 30 dias): {C_CYAN}{media_30_dias_f}{C_RESET}")
+    print(f"    • Média semanal geral (Todo o histórico): {C_CYAN}{media_sem_hist_f}{C_RESET}")
+    print_divider()
+    
+    # Previsão e Diagnóstico
+    print(f"  {C_BOLD}Previsão de Conclusão (Expectativa vs Realidade):{C_RESET}")
+    
+    if ritmo_diario <= 0.0:
+        print(f"    {C_YELLOW}⚠ Não há dados de estudos suficientes para calcular a previsão de término.{C_RESET}")
+        print("    Registre suas sessões de estudo para começar a ver as projeções de ritmo.")
+    else:
+        previsao_conclusao = metricas["previsao_conclusao"]
+        dias_para_concluir = metricas["dias_para_concluir"]
+        
+        # Formata data da previsão
+        data_previsao_str = previsao_conclusao.strftime("%d/%m/%Y %H:%M")
+        
+        # Calcula ritmo semanal do usuário baseado no ritmo diário atual
+        ritmo_semanal_atual = ritmo_diario * 7.0
+        ritmo_semanal_atual_f = formatar_horas_minutos(ritmo_semanal_atual)
+        ritmo_ideal_semanal_f = formatar_horas_minutos(horas_totais)
+        
+        print(f"    • Ritmo Diário Atual:   {C_GREEN}{formatar_horas_minutos(ritmo_diario)}{C_RESET}/dia (Base: {origem_ritmo})")
+        print(f"    • Ritmo Semanal Atual:  {C_GREEN}{ritmo_semanal_atual_f}{C_RESET}/semana")
+        print(f"    • Ritmo Diário Ideal:   {C_CYAN}{formatar_horas_minutos(ritmo_ideal_diario)}{C_RESET}/dia (para fechar em 7 dias)")
+        
+        if horas_restantes <= 0.0:
+            print(f"\n    {C_GREEN}🎉 Ciclo concluído! Vá para o menu e verifique a conclusão para reiniciar.{C_RESET}")
+        else:
+            print(f"    • Prazo Estimado:       {C_BOLD}{dias_para_concluir:.1f} dias{C_RESET} restantes")
+            print(f"    • Data Prevista:        {C_GREEN}{data_previsao_str}{C_RESET}")
+            
+            # Diagnóstico Comparativo
+            print()
+            if ritmo_semanal_atual >= horas_totais:
+                print(f"    {C_GREEN}✔ [RITMO EXCELENTE] Seu ritmo é suficiente para concluir o ciclo dentro do prazo semanal!{C_RESET}")
+                print("    Você está mantendo a constância necessária. Continue assim!")
+            elif ritmo_semanal_atual >= horas_totais * 0.7:
+                print(f"    {C_YELLOW}⚠ [RITMO MODERADO] Seu ritmo atual está levemente abaixo do ideal.{C_RESET}")
+                print(f"    Para concluir o ciclo exatamente em 7 dias, tente estudar mais {formatar_horas_minutos(ritmo_ideal_diario - ritmo_diario)} por dia.")
+            else:
+                print(f"    {C_RED}✘ [RITMO INSUFICIENTE] Seu ritmo está muito abaixo do planejado.{C_RESET}")
+                print(f"    Realidade: Você está estudando {ritmo_semanal_atual_f}/semana (Meta: {ritmo_ideal_semanal_f}/semana).")
+                print(f"    Com este ritmo, você demorará {dias_para_concluir:.1f} dias para concluir o que resta.")
+                print(f"    {C_YELLOW}Recomendação: Ajuste sua rotina diária ou reduza sua meta de horas semanais no menu principal.{C_RESET}")
+                
+    if pausar:
+        print(C_CYAN + "─" * UI_WIDTH + C_RESET)
+        input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
+
 def menu_ciclo_progresso(dados):
     """Submenu para gerenciar o ciclo de estudos e progresso."""
     while True:
@@ -887,6 +1119,7 @@ def menu_ciclo_progresso(dados):
             print(f"  [{C_CYAN}2{C_RESET}] 📝 Registrar Progresso de Estudos")
             print(f"  [{C_CYAN}3{C_RESET}] ⚙️  Ajustar Progresso Acumulado")
             print(f"  [{C_CYAN}4{C_RESET}] ⏱️  Alterar Horas Semanais")
+            print(f"  [{C_CYAN}5{C_RESET}] 📊 Painel de Acompanhamento do Ciclo")
             print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
             print_divider()
             
@@ -900,10 +1133,12 @@ def menu_ciclo_progresso(dados):
                     ajustar_progresso(dados)
                 elif opcao == "4":
                     alterar_horas(dados)
+                elif opcao == "5":
+                    exibir_acompanhamento_ciclo(dados)
                 elif opcao == "0":
                     break
                 else:
-                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 4.{C_RESET}")
+                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0 e 5.{C_RESET}")
                     input("\nPressione Enter para tentar novamente...")
             except KeyboardInterrupt:
                 pass
