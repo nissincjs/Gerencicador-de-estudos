@@ -1,10 +1,11 @@
 from datetime import datetime
 from constants import (
-    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, DB_FILE, UI_WIDTH
+    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, DB_FILE
 )
 from utils import (
     clear_screen, print_header, print_divider, mostrar_guia_dificuldade,
-    obter_input_float, obter_input_str, parse_tempo_input, formatar_horas_minutos
+    obter_input_float, obter_input_str, parse_tempo_input, formatar_horas_minutos,
+    obter_largura_ui
 )
 from database import salvar_dados
 
@@ -346,9 +347,10 @@ def verificar_conclusao_ciclo(dados):
         salvar_dados(dados)
         
         clear_screen()
-        print(C_GREEN + "╔" + "═" * (UI_WIDTH - 2) + "╗")
-        print("║" + "🎉 PARABÉNS! VOCÊ CONCLUIU SEU CICLO DE ESTUDOS! 🎉".center(UI_WIDTH - 2) + "║")
-        print("╚" + "═" * (UI_WIDTH - 2) + "╝" + C_RESET)
+        width = obter_largura_ui()
+        print(C_GREEN + "╔" + "═" * (width - 2) + "╗")
+        print("║" + "🎉 PARABÉNS! VOCÊ CONCLUIU SEU CICLO DE ESTUDOS! 🎉".center(width - 2) + "║")
+        print("╚" + "═" * (width - 2) + "╝" + C_RESET)
         print(f"\n  • Início do Ciclo: {novo_ciclo_historico['data_inicio']}")
         print(f"  • Fim do Ciclo:    {novo_ciclo_historico['data_fim']}")
         print(f"  • Carga Horária:   {horas_totais}h total de foco")
@@ -1029,12 +1031,16 @@ def exibir_acompanhamento_ciclo(dados, pausar=True):
     else:
         tempo_ciclo_str = f"{minutos_int}m (recém-iniciado)"
         
+    import partner_menu
+    streak = partner_menu.calcular_streak(dados)
+    
     print(f"  {C_BOLD}Progresso Geral do Ciclo Atual:{C_RESET}")
     print(f"    • Meta Total:      {C_CYAN}{horas_totais_f}{C_RESET}")
     print(f"    • Total Estudado:  {C_GREEN}{total_estudado_f}{C_RESET}")
     print(f"    • Tempo Restante:  {C_YELLOW if horas_restantes > 0 else C_GREEN}{horas_restantes_f}{C_RESET}")
     print(f"    • Barra de Status: {barra_str}")
     print(f"    • Tempo Decorrido: {C_BOLD}{tempo_ciclo_str}{C_RESET} desde o início")
+    print(f"    • Sequência Atual: {C_GREEN}{streak} dias seguidos{C_RESET} 🔥")
     print_divider()
     
     # Ritmo e Médias de Estudo
@@ -1053,6 +1059,10 @@ def exibir_acompanhamento_ciclo(dados, pausar=True):
     print(f"    • Horas nesta semana (Últimos 7 dias): {C_GREEN}{horas_7_dias_f}{C_RESET}")
     print(f"    • Média semanal recente (Últimos 30 dias): {C_CYAN}{media_30_dias_f}{C_RESET}")
     print(f"    • Média semanal geral (Todo o histórico): {C_CYAN}{media_sem_hist_f}{C_RESET}")
+    print_divider()
+    
+    # Calendário de Consistência
+    partner_menu.exibir_calendario_consistencia(dados)
     print_divider()
     
     # Previsão e Diagnóstico
@@ -1098,11 +1108,12 @@ def exibir_acompanhamento_ciclo(dados, pausar=True):
                 print(f"    {C_YELLOW}Recomendação: Ajuste sua rotina diária ou reduza sua meta de horas semanais no menu principal.{C_RESET}")
                 
     if pausar:
-        print(C_CYAN + "─" * UI_WIDTH + C_RESET)
+        print_divider()
         input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
 
 def menu_ciclo_progresso(dados):
     """Submenu para gerenciar o ciclo de estudos e progresso."""
+    import partner_menu
     while True:
         try:
             clear_screen()
@@ -1110,9 +1121,10 @@ def menu_ciclo_progresso(dados):
             
             horas = dados.get("horas_semanais", 0.0)
             total_estudado = sum(dados.get("progresso_atual", {}).values())
+            streak = partner_menu.calcular_streak(dados)
             carga_formatada = formatar_horas_minutos(horas)
             estudado_formatado = formatar_horas_minutos(total_estudado)
-            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET}")
+            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Sequência:{C_RESET} {C_GREEN}{streak} dias{C_RESET} 🔥")
             print_divider()
             
             print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")

@@ -23,4 +23,3 @@ C_BOLD = "\033[1m"
 C_RESET = "\033[0m"
 
 DB_FILE = "ciclo_estudos.json"
-UI_WIDTH = 80

@@ -223,10 +223,11 @@ def main():
             horas = dados.get("horas_semanais", 0.0)
             num_materias = len(dados.get("materias", []))
             total_estudado = sum(dados.get("progresso_atual", {}).values())
+            streak = partner_menu.calcular_streak(dados)
             
             carga_formatada = formatar_horas_minutos(horas)
             estudado_formatado = formatar_horas_minutos(total_estudado)
-            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET}   |   {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET}   |   {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET}")
+            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET} | {C_BOLD}Sequência:{C_RESET} {C_GREEN}{streak} dias{C_RESET} 🔥")
             print_divider()
             
             print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")

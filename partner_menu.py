@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 import supabase_client
 import calendar
 from constants import (
-    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, UI_WIDTH
+    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
 from utils import (
     clear_screen, print_header, print_divider, obter_input_str, formatar_horas_minutos, obter_input_float

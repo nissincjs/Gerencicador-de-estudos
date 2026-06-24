@@ -1,26 +1,36 @@
 import os
 import re
+import shutil
 from constants import (
-    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, UI_WIDTH
+    C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
+
+def obter_largura_ui():
+    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 80, max 100)."""
+    try:
+        cols = shutil.get_terminal_size((80, 20)).columns
+        return max(80, min(100, cols))
+    except Exception:
+        return 80
 
 def clear_screen():
     """Limpa a tela do terminal."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_header(title):
-    """Exibe um cabeçalho estilizado com bordas duplas (largura de UI_WIDTH colunas)."""
-    print(C_CYAN + "╔" + "═" * (UI_WIDTH - 2) + "╗")
-    print(f"║{title.center(UI_WIDTH - 2)}║")
-    print("╚" + "═" * (UI_WIDTH - 2) + "╝" + C_RESET)
+    """Exibe um cabeçalho estilizado com bordas duplas (largura dinâmica)."""
+    width = obter_largura_ui()
+    print(C_CYAN + "╔" + "═" * (width - 2) + "╗")
+    print(f"║{title.center(width - 2)}║")
+    print("╚" + "═" * (width - 2) + "╝" + C_RESET)
 
 def print_divider():
-    """Exibe uma linha divisória sólida em ciano (largura de UI_WIDTH colunas)."""
-    print(C_CYAN + "─" * UI_WIDTH + C_RESET)
+    """Exibe uma linha divisória sólida em ciano (largura dinâmica)."""
+    print(C_CYAN + "─" * obter_largura_ui() + C_RESET)
 
 def mostrar_guia_dificuldade():
     """Exibe uma legenda explicativa sobre os níveis de dificuldade com base em acertos."""
-    inner_width = UI_WIDTH - 2
+    inner_width = obter_largura_ui() - 2
     print(C_YELLOW + "┌" + "─" * inner_width + "┐")
     print("│" + " GUIA DE ESTIMATIVA DE DIFICULDADE (Baseado em acertos):".ljust(inner_width) + "│")
     print("│" + "   1 - Ótimo domínio (>85% de acertos em questões)".ljust(inner_width) + "│")
