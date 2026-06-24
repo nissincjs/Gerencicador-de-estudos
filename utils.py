@@ -6,33 +6,51 @@ from constants import (
 )
 
 def obter_largura_ui(largura_max=115):
-    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 80)."""
+    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 70)."""
     try:
         cols = shutil.get_terminal_size((80, 20)).columns
         limite_superior = largura_max if largura_max is not None else cols - 4
-        return max(80, min(limite_superior, cols - 4))
+        return max(70, min(limite_superior, cols - 4))
     except Exception:
-        return 80
+        return 70
 
-_largura_atual = 80
+_largura_atual = 70
 _largura_manual = False
 _ultimo_ajuste_zoom = 0
+_margem_atual = ""
+_tamanho_terminal_ultimo_ajuste = None
 
 def atualizar_largura_dinamica():
-    global _largura_atual
+    global _largura_atual, _margem_atual
     if not _largura_manual:
         try:
             cols = shutil.get_terminal_size((80, 20)).columns
             # Limit the default width of menus/headers to 115 to occupy a larger area
-            _largura_atual = max(80, min(115, cols - 4))
+            _largura_atual = max(70, min(115, cols - 4))
+            
+            # Recalculate margins
+            if cols > _largura_atual:
+                _margem_atual = " " * ((cols - _largura_atual) // 2)
+            else:
+                _margem_atual = ""
         except Exception:
-            _largura_atual = 80
+            _largura_atual = 70
+            _margem_atual = ""
+    else:
+        try:
+            cols = shutil.get_terminal_size((80, 20)).columns
+            if cols > _largura_atual:
+                _margem_atual = " " * ((cols - _largura_atual) // 2)
+            else:
+                _margem_atual = ""
+        except Exception:
+            _margem_atual = ""
 
 def obter_margem_esquerda(largura_conteudo=None):
     """Retorna a margem esquerda (espaços em branco) para centralizar um conteúdo no terminal."""
     if largura_conteudo is None:
         atualizar_largura_dinamica()
-        largura_conteudo = _largura_atual
+        return _margem_atual
     try:
         cols = shutil.get_terminal_size((80, 20)).columns
         if cols > largura_conteudo:
@@ -45,15 +63,17 @@ def set_largura_atual(largura):
     global _largura_atual, _largura_manual
     _largura_atual = largura
     _largura_manual = True
+    atualizar_largura_dinamica()
 
 def reset_largura_atual():
     global _largura_atual, _largura_manual
-    _largura_atual = 80
+    _largura_atual = 70
     _largura_manual = False
+    atualizar_largura_dinamica()
 
 def print_override(*args, **kwargs):
-    atualizar_largura_dinamica()
-    margin = obter_margem_esquerda(_largura_atual)
+    # Use cached margin to avoid flicker and dynamic layout changes mid-draw
+    margin = _margem_atual
     import builtins
     if args:
         val = str(args[0])
@@ -78,39 +98,40 @@ def _formatar_prompt(prompt, margin):
         return margin + val
 
 def input_override(prompt=""):
-    atualizar_largura_dinamica()
-    margin = obter_margem_esquerda(_largura_atual)
+    margin = _margem_atual
     import builtins
     return builtins.input(_formatar_prompt(prompt, margin))
 
 def print_l(texto, largura_ref=None):
     """Imprime uma linha de texto adicionando a margem esquerda para centralização."""
-    atualizar_largura_dinamica()
     if largura_ref is None:
-        largura_ref = _largura_atual
-    margin = obter_margem_esquerda(largura_ref)
+        margin = _margem_atual
+    else:
+        margin = obter_margem_esquerda(largura_ref)
     print(margin + texto)
 
 def input_l(prompt, largura_ref=None):
     """Lê do input padrão com a margem esquerda apropriada para alinhamento."""
-    atualizar_largura_dinamica()
     if largura_ref is None:
-        largura_ref = _largura_atual
-    margin = obter_margem_esquerda(largura_ref)
+        margin = _margem_atual
+    else:
+        margin = obter_margem_esquerda(largura_ref)
     return input(margin + prompt)
 
 def clear_screen():
     """Limpa a tela do terminal e ajusta o zoom automaticamente se necessário."""
     auto_ajustar_zoom()
+    atualizar_largura_dinamica() # Refresh terminal layout dimensions at start of frame
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_header(title, width=None):
     """Exibe um cabeçalho estilizado com bordas duplas (largura fixa ou dinâmica, centralizado)."""
-    atualizar_largura_dinamica()
     if width is None:
         width = _largura_atual
-    width = max(80, width)
-    margin = obter_margem_esquerda(width)
+        margin = _margem_atual
+    else:
+        width = max(70, width)
+        margin = obter_margem_esquerda(width)
     import builtins
     builtins.print(margin + C_CYAN + "╔" + "═" * (width - 2) + "╗")
     builtins.print(margin + f"║{title.center(width - 2)}║")
@@ -118,20 +139,22 @@ def print_header(title, width=None):
 
 def print_divider(width=None):
     """Exibe uma linha divisória sólida em ciano (largura dinâmica ou fixa, centralizada)."""
-    atualizar_largura_dinamica()
     if width is None:
         width = _largura_atual
-    width = max(80, width)
-    margin = obter_margem_esquerda(width)
+        margin = _margem_atual
+    else:
+        width = max(70, width)
+        margin = obter_margem_esquerda(width)
     import builtins
     builtins.print(margin + C_CYAN + "─" * width + C_RESET)
 
 def mostrar_guia_dificuldade(largura_ref=None):
     """Exibe uma legenda explicativa sobre os níveis de dificuldade com base em acertos (centralizada)."""
-    atualizar_largura_dinamica()
     if largura_ref is None:
         largura_ref = _largura_atual
-    margin = obter_margem_esquerda(largura_ref)
+        margin = _margem_atual
+    else:
+        margin = obter_margem_esquerda(largura_ref)
     inner_width = largura_ref - 2
     import builtins
     builtins.print(margin + C_YELLOW + "┌" + "─" * inner_width + "┐")
@@ -145,10 +168,10 @@ def mostrar_guia_dificuldade(largura_ref=None):
 
 def obter_input_float(prompt, min_val=None, max_val=None, default=None, largura_ref=None):
     """Lê e valida uma entrada decimal (alinhada à margem esquerda)."""
-    atualizar_largura_dinamica()
     if largura_ref is None:
-        largura_ref = _largura_atual
-    margin = obter_margem_esquerda(largura_ref)
+        margin = _margem_atual
+    else:
+        margin = obter_margem_esquerda(largura_ref)
     import builtins
     while True:
         try:
@@ -168,10 +191,10 @@ def obter_input_float(prompt, min_val=None, max_val=None, default=None, largura_
 
 def obter_input_str(prompt, obrigatorio=True, default=None, largura_ref=None):
     """Lê e valida uma entrada de texto (alinhada à margem esquerda)."""
-    atualizar_largura_dinamica()
     if largura_ref is None:
-        largura_ref = _largura_atual
-    margin = obter_margem_esquerda(largura_ref)
+        margin = _margem_atual
+    else:
+        margin = obter_margem_esquerda(largura_ref)
     import builtins
     while True:
         entrada = builtins.input(_formatar_prompt(prompt, margin)).strip()
@@ -308,33 +331,59 @@ def auto_ajustar_zoom():
     """Detecta se o terminal está muito largo ou muito estreito e ajusta o zoom automaticamente."""
     if os.name != 'nt':
         return
-    global _ultimo_ajuste_zoom
+        
+    global _tamanho_terminal_ultimo_ajuste, _ultimo_ajuste_zoom
     import time
-    agora = time.time()
     
-    # Evita reajustes de zoom muito frequentes (intervalo mínimo de 1.2 segundos)
-    if agora - _ultimo_ajuste_zoom < 1.2:
+    try:
+        size = shutil.get_terminal_size((80, 20))
+        cols, rows = size.columns, size.lines
+    except Exception:
+        return
+
+    # Se o tamanho atual for igual ao último após o ajuste, não há necessidade de reajustar
+    if _tamanho_terminal_ultimo_ajuste == (cols, rows):
+        return
+
+    agora = time.time()
+    # Evita reajustes de zoom se tiver ocorrido um ajuste há menos de 1.0 segundo (evita loops rápidos na inicialização/redimensionamento manual)
+    if agora - _ultimo_ajuste_zoom < 1.0:
         return
         
-    try:
-        cols = shutil.get_terminal_size((80, 20)).columns
-        
-        # Feedback loop para manter a largura do terminal ideal entre 75 e 110 colunas
+    # Feedback loop para manter a largura do terminal ideal entre 75 e 110 colunas
+    max_tentativas = 8
+    tentativa = 0
+    tamanho_anterior = (cols, rows)
+    
+    while tentativa < max_tentativas:
+        if 75 <= cols <= 110:
+            break
+            
+        # Ajusta dependendo da distância do tamanho ideal
         if cols > 160:
-            ajustar_zoom_console(3)
-            _ultimo_ajuste_zoom = agora
-            time.sleep(0.15)
-        elif cols > 135:
             ajustar_zoom_console(2)
-            _ultimo_ajuste_zoom = agora
-            time.sleep(0.15)
         elif cols > 110:
             ajustar_zoom_console(1)
-            _ultimo_ajuste_zoom = agora
-            time.sleep(0.15)
         elif cols < 75:
             ajustar_zoom_console_out(1)
-            _ultimo_ajuste_zoom = agora
-            time.sleep(0.15)
-    except Exception:
-        pass
+            
+        # Espera um curto período para a janela do console atualizar a fonte e o grid de caracteres
+        time.sleep(0.08)
+        
+        try:
+            size = shutil.get_terminal_size((80, 20))
+            cols, rows = size.columns, size.lines
+        except Exception:
+            break
+            
+        # Se o tamanho de caracteres não mudou após o comando de zoom, significa que
+        # atingimos o limite de zoom da janela ou o console não responde a atalhos.
+        if (cols, rows) == tamanho_anterior:
+            break
+            
+        tamanho_anterior = (cols, rows)
+        tentativa += 1
+
+    # Registra o estado atual estável do terminal
+    _tamanho_terminal_ultimo_ajuste = (cols, rows)
+    _ultimo_ajuste_zoom = time.time()

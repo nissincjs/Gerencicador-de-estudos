@@ -299,7 +299,7 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
     max_ass = max(15, max((len(r["assunto"]) for r in lista_revisoes), default=15))
     
     largura_ideal = colunas_fixas + max_mat + max_ass
-    largura_tabela = max(80, min(largura_ideal, cols - 4))
+    largura_tabela = max(70, min(largura_ideal, cols - 4))
     
     # Distribui a largura restante entre matéria e assunto
     espaco_restante = largura_tabela - colunas_fixas
@@ -308,9 +308,9 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
     w_ass = espaco_restante - w_mat
     
     # Garante tamanhos mínimos adequados
-    if w_mat < 10:
-        w_mat = 10
-        w_ass = max(10, espaco_restante - w_mat)
+    if w_mat < 5:
+        w_mat = 5
+        w_ass = max(5, espaco_restante - w_mat)
         
     import utils
     utils.set_largura_atual(largura_tabela)

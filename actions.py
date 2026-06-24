@@ -18,15 +18,15 @@ def exibir_ciclo(dados, pausar=True):
     
     import shutil
     cols = shutil.get_terminal_size((80, 20)).columns
-    largura_tabela = max(80, min(95, cols - 4))
+    largura_tabela = max(70, min(95, cols - 4))
     
     if largura_tabela < 90:
         w_quest = 5
         w_peso = 5
         w_dif = 3
-        w_meta = 9
-        w_estudado = 9
-        w_restante = 9
+        w_meta = 10
+        w_estudado = 10
+        w_restante = 10
     else:
         w_quest = 6
         w_peso = 7
@@ -94,8 +94,8 @@ def exibir_ciclo(dados, pausar=True):
 
         header = (
             C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_materia}} " +
-            C_CYAN + "│" + C_RESET + f" {'Quest.':>{w_quest}} " +
-            C_CYAN + "│" + C_RESET + f" {'Peso Q.':>{w_peso}} " +
+            C_CYAN + "│" + C_RESET + f" {'Quest.' if w_quest >= 6 else 'Qst.':>{w_quest}} " +
+            C_CYAN + "│" + C_RESET + f" {'Peso Q.' if w_peso >= 7 else 'Peso':>{w_peso}} " +
             C_CYAN + "│" + C_RESET + f" {'Dif':>{w_dif}} " +
             C_CYAN + "│" + C_RESET + f" {'Meta':>{w_meta}} " +
             C_CYAN + "│" + C_RESET + f" {'Estudado':>{w_estudado}} " +
