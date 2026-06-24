@@ -16,20 +16,26 @@ def exibir_ciclo(dados, pausar=True):
     
     materias = dados.get("materias", [])
     
-    w_quest = 6
-    w_peso = 7
-    w_dif = 3
-    w_meta = 12
-    w_estudado = 12
-    w_restante = 12
-    colunas_fixas_e_delimitadores = 74 # w_quest+w_peso+w_dif+w_meta+w_estudado+w_restante + 22
+    import shutil
+    cols = shutil.get_terminal_size((80, 20)).columns
+    largura_tabela = max(80, min(95, cols - 4))
     
-    # Determina a largura mínima da coluna "Matéria" com base no nome mais longo das matérias
-    w_materia_min = max(15, max((len(m["nome"]) for m in materias), default=15))
-    
-    # Obtém a largura da UI ideal e calcula a largura total da tabela e a largura da coluna de Matéria
-    largura_tabela = obter_largura_ui(largura_max=None)
-    largura_tabela = max(largura_tabela, w_materia_min + colunas_fixas_e_delimitadores)
+    if largura_tabela < 90:
+        w_quest = 5
+        w_peso = 5
+        w_dif = 3
+        w_meta = 9
+        w_estudado = 9
+        w_restante = 9
+    else:
+        w_quest = 6
+        w_peso = 7
+        w_dif = 3
+        w_meta = 12
+        w_estudado = 12
+        w_restante = 12
+        
+    colunas_fixas_e_delimitadores = w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22
     w_materia = largura_tabela - colunas_fixas_e_delimitadores
     
     set_largura_atual(largura_tabela)
@@ -119,8 +125,12 @@ def exibir_ciclo(dados, pausar=True):
             
             restante_exibicao = f"{C_GREEN}{restante_formatada:>{w_restante}}{C_RESET}" if restante_formatada == "Concluído" else f"{restante_formatada:>{w_restante}}"
             
+            nome_exibido = mc["nome"]
+            if len(nome_exibido) > w_materia:
+                nome_exibido = nome_exibido[:w_materia - 3] + "..."
+                
             print(
-                C_CYAN + "│" + C_RESET + f" {mc['nome']:<{w_materia}} " +
+                C_CYAN + "│" + C_RESET + f" {nome_exibido:<{w_materia}} " +
                 C_CYAN + "│" + C_RESET + f" {mc['questoes_prova']:>{w_quest}.1f} " +
                 C_CYAN + "│" + C_RESET + f" {mc['peso_questao']:>{w_peso}.1f} " +
                 C_CYAN + "│" + C_RESET + f" {mc['dificuldade']:>{w_dif}.1f} " +

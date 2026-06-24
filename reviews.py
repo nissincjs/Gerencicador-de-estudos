@@ -284,16 +284,34 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
         print(f"\n{C_YELLOW}⚠ Nenhuma revisão pendente ou cadastrada.{C_RESET}")
         return False
         
+    import shutil
+    cols = shutil.get_terminal_size((80, 20)).columns
+    
     w_id = 3
-    w_mat = max(13, max(len(r["materia"]) for r in lista_revisoes))
-    w_ass = max(15, max(len(r["assunto"]) for r in lista_revisoes))
     w_data = 10
     w_pct = 6
     w_prox = 10
-    w_stat = 14
+    w_stat = 10 if cols < 90 else 14
     
-    largura_tabela = w_id + w_mat + w_ass + w_data + w_pct + w_prox + w_stat + 22
+    colunas_fixas = w_id + w_data + w_pct + w_prox + w_stat + 22
     
+    max_mat = max(13, max((len(r["materia"]) for r in lista_revisoes), default=13))
+    max_ass = max(15, max((len(r["assunto"]) for r in lista_revisoes), default=15))
+    
+    largura_ideal = colunas_fixas + max_mat + max_ass
+    largura_tabela = max(80, min(largura_ideal, cols - 4))
+    
+    # Distribui a largura restante entre matéria e assunto
+    espaco_restante = largura_tabela - colunas_fixas
+    soma_max = max_mat + max_ass
+    w_mat = int(espaco_restante * (max_mat / soma_max))
+    w_ass = espaco_restante - w_mat
+    
+    # Garante tamanhos mínimos adequados
+    if w_mat < 10:
+        w_mat = 10
+        w_ass = max(10, espaco_restante - w_mat)
+        
     import utils
     utils.set_largura_atual(largura_tabela)
     try:
@@ -324,7 +342,12 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
             status_str, _ = calcular_status_e_dias(r['data_proxima_revisao'])
             
             mat_exibicao = r['materia']
+            if len(mat_exibicao) > w_mat:
+                mat_exibicao = mat_exibicao[:w_mat - 3] + "..."
+                
             ass_exibicao = r['assunto']
+            if len(ass_exibicao) > w_ass:
+                ass_exibicao = ass_exibicao[:w_ass - 3] + "..."
             
             # Corrige o padding considerando que o status_str pode conter caracteres de escape ANSI de cor
             clean_status = re.sub(r'\033\[[0-9;]*m', '', status_str)

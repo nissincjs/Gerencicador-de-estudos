@@ -5,7 +5,7 @@ from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
 
-def obter_largura_ui(largura_max=None):
+def obter_largura_ui(largura_max=115):
     """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 80)."""
     try:
         cols = shutil.get_terminal_size((80, 20)).columns
@@ -16,13 +16,15 @@ def obter_largura_ui(largura_max=None):
 
 _largura_atual = 80
 _largura_manual = False
+_ultimo_ajuste_zoom = 0
 
 def atualizar_largura_dinamica():
     global _largura_atual
     if not _largura_manual:
         try:
             cols = shutil.get_terminal_size((80, 20)).columns
-            _largura_atual = max(80, cols - 4)
+            # Limit the default width of menus/headers to 115 to occupy a larger area
+            _largura_atual = max(80, min(115, cols - 4))
         except Exception:
             _largura_atual = 80
 
@@ -98,7 +100,8 @@ def input_l(prompt, largura_ref=None):
     return input(margin + prompt)
 
 def clear_screen():
-    """Limpa a tela do terminal."""
+    """Limpa a tela do terminal e ajusta o zoom automaticamente se necessário."""
+    auto_ajustar_zoom()
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_header(title, width=None):
@@ -256,3 +259,82 @@ def formatar_horas_minutos(horas_decimais):
         return "0s"
         
     return " ".join(partes)
+
+def ajustar_zoom_console(passos=1):
+    """Ajusta o nível de zoom do terminal enviando atalhos de teclado (Ctrl + +) no Windows."""
+    if os.name != 'nt':
+        return
+    try:
+        import ctypes
+        import time
+        user32 = ctypes.windll.user32
+        
+        VK_CONTROL = 0x11
+        VK_OEM_PLUS = 0xBB
+        KEYEVENTF_KEYUP = 0x0002
+        
+        for _ in range(passos):
+            user32.keybd_event(VK_CONTROL, 0, 0, 0)
+            user32.keybd_event(VK_OEM_PLUS, 0, 0, 0)
+            user32.keybd_event(VK_OEM_PLUS, 0, KEYEVENTF_KEYUP, 0)
+            user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+            time.sleep(0.05)
+    except Exception:
+        pass
+
+def ajustar_zoom_console_out(passos=1):
+    """Diminui o nível de zoom do terminal enviando atalhos de teclado (Ctrl + -) no Windows."""
+    if os.name != 'nt':
+        return
+    try:
+        import ctypes
+        import time
+        user32 = ctypes.windll.user32
+        
+        VK_CONTROL = 0x11
+        VK_OEM_MINUS = 0xBD
+        KEYEVENTF_KEYUP = 0x0002
+        
+        for _ in range(passos):
+            user32.keybd_event(VK_CONTROL, 0, 0, 0)
+            user32.keybd_event(VK_OEM_MINUS, 0, 0, 0)
+            user32.keybd_event(VK_OEM_MINUS, 0, KEYEVENTF_KEYUP, 0)
+            user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+            time.sleep(0.05)
+    except Exception:
+        pass
+
+def auto_ajustar_zoom():
+    """Detecta se o terminal está muito largo ou muito estreito e ajusta o zoom automaticamente."""
+    if os.name != 'nt':
+        return
+    global _ultimo_ajuste_zoom
+    import time
+    agora = time.time()
+    
+    # Evita reajustes de zoom muito frequentes (intervalo mínimo de 1.2 segundos)
+    if agora - _ultimo_ajuste_zoom < 1.2:
+        return
+        
+    try:
+        cols = shutil.get_terminal_size((80, 20)).columns
+        
+        # Feedback loop para manter a largura do terminal ideal entre 75 e 110 colunas
+        if cols > 160:
+            ajustar_zoom_console(3)
+            _ultimo_ajuste_zoom = agora
+            time.sleep(0.15)
+        elif cols > 135:
+            ajustar_zoom_console(2)
+            _ultimo_ajuste_zoom = agora
+            time.sleep(0.15)
+        elif cols > 110:
+            ajustar_zoom_console(1)
+            _ultimo_ajuste_zoom = agora
+            time.sleep(0.15)
+        elif cols < 75:
+            ajustar_zoom_console_out(1)
+            _ultimo_ajuste_zoom = agora
+            time.sleep(0.15)
+    except Exception:
+        pass

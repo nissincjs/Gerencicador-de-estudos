@@ -42,6 +42,10 @@ def e_vazio(dados: dict) -> bool:
     return len(materias) == 0 and horas == 0.0
 
 def main():
+    # Ajusta o zoom automaticamente se o terminal estiver muito grande no Windows
+    from utils import auto_ajustar_zoom
+    auto_ajustar_zoom()
+
     # Verifica se o Supabase está devidamente configurado
     if not supabase_client.esta_configurado():
         clear_screen()
