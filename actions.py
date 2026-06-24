@@ -5,142 +5,146 @@ from constants import (
 from utils import (
     clear_screen, print_header, print_divider, mostrar_guia_dificuldade,
     obter_input_float, obter_input_str, parse_tempo_input, formatar_horas_minutos,
-    obter_largura_ui
+    obter_largura_ui, print_override as print, input_override as input,
+    set_largura_atual, reset_largura_atual
 )
 from database import salvar_dados
 
 def exibir_ciclo(dados, pausar=True):
-    """Exibe o ciclo de estudos calculado com progresso em formato de tabela estilizada."""
+    """Exibe o ciclo de estudos calculado com progresso em formato de tabela estilizada (responsiva e centralizada)."""
     clear_screen()
     
     materias = dados.get("materias", [])
     
-    # Determina a largura da coluna "Matéria" com base no nome mais longo das matérias cadastradas
-    if materias:
-        w_materia = max(15, max(len(m["nome"]) for m in materias))
-    else:
-        w_materia = 15
-        
     w_quest = 6
     w_peso = 7
     w_dif = 3
     w_meta = 12
     w_estudado = 12
     w_restante = 12
+    colunas_fixas_e_delimitadores = 74 # w_quest+w_peso+w_dif+w_meta+w_estudado+w_restante + 22
     
-    # Calcula a largura total da tabela para alinhar perfeitamente cabeçalho, divisores e bordas
-    # (7 colunas + 7 separadores de 2 espaços + 8 barras verticais = w_materia + w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22)
-    largura_tabela = w_materia + w_quest + w_peso + w_dif + w_meta + w_estudado + w_restante + 22
+    # Determina a largura mínima da coluna "Matéria" com base no nome mais longo das matérias
+    w_materia_min = max(15, max((len(m["nome"]) for m in materias), default=15))
     
-    # Exibe o cabeçalho ajustado para a largura dinâmica da tabela
-    print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
-    print(f"║{C_CYAN}{'SEU CICLO DE ESTUDOS ESTRATÉGICO'.center(largura_tabela - 2)}{C_RESET}║")
-    print("╚" + "═" * (largura_tabela - 2) + "╝")
+    # Obtém a largura da UI ideal e calcula a largura total da tabela e a largura da coluna de Matéria
+    largura_tabela = obter_largura_ui(largura_max=None)
+    largura_tabela = max(largura_tabela, w_materia_min + colunas_fixas_e_delimitadores)
+    w_materia = largura_tabela - colunas_fixas_e_delimitadores
     
-    horas_totais = dados.get("horas_semanais", 0.0)
-    data_inicio = dados.get("data_inicio_ciclo", "N/A")
-    progresso = dados.get("progresso_atual", {})
-    
-    if not materias:
-        print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada ainda!{C_RESET}")
-        print("Adicione matérias no menu principal para gerar o ciclo.")
-        if pausar:
-            print(C_CYAN + "─" * largura_tabela + C_RESET)
-            input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
-        return
+    set_largura_atual(largura_tabela)
+    try:
+        # Exibe o cabeçalho ajustado para a largura dinâmica da tabela
+        print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
+        print(f"║{C_CYAN}{'SEU CICLO DE ESTUDOS ESTRATÉGICO'.center(largura_tabela - 2)}{C_RESET}║")
+        print("╚" + "═" * (largura_tabela - 2) + "╝")
+        
+        horas_totais = dados.get("horas_semanais", 0.0)
+        data_inicio = dados.get("data_inicio_ciclo", "N/A")
+        progresso = dados.get("progresso_atual", {})
+        
+        if not materias:
+            print(f"\n{C_YELLOW}⚠ Nenhuma matéria cadastrada ainda!{C_RESET}")
+            print("Adicione matérias no menu principal para gerar o ciclo.")
+            if pausar:
+                print(C_CYAN + "─" * largura_tabela + C_RESET)
+                input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
+            return
 
-    print(f"  {C_BOLD}Ciclo iniciado em:{C_RESET} {C_GREEN}{data_inicio}{C_RESET}")
-    horas_totais_formatado = formatar_horas_minutos(horas_totais)
-    print(f"  {C_BOLD}Total de Horas do Ciclo:{C_RESET} {C_GREEN}{horas_totais_formatado}{C_RESET}")
-    
-    # Divisor da largura exata da tabela
-    print(C_CYAN + "─" * largura_tabela + C_RESET)
+        print(f"  {C_BOLD}Ciclo iniciado em:{C_RESET} {C_GREEN}{data_inicio}{C_RESET}")
+        horas_totais_formatado = formatar_horas_minutos(horas_totais)
+        print(f"  {C_BOLD}Total de Horas do Ciclo:{C_RESET} {C_GREEN}{horas_totais_formatado}{C_RESET}")
+        
+        # Divisor da largura exata da tabela
+        print(C_CYAN + "─" * largura_tabela + C_RESET)
 
-    # Calcular o fator de cada matéria com base na fórmula estratégica
-    fator_total = 0.0
-    materias_calculadas = []
-    
-    for m in materias:
-        questoes_prova = m.get("questoes_prova", 10.0)
-        peso_questao = m.get("peso_questao", 1.0)
-        dificuldade = m.get("dificuldade", 1.0)
+        # Calcular o fator de cada matéria com base na fórmula estratégica
+        fator_total = 0.0
+        materias_calculadas = []
         
-        fator = (questoes_prova * peso_questao) * dificuldade
-        fator_total += fator
-        
-        materias_calculadas.append({
-            "nome": m["nome"],
-            "questoes_prova": questoes_prova,
-            "peso_questao": peso_questao,
-            "dificuldade": dificuldade,
-            "fator": fator
-        })
+        for m in materias:
+            questoes_prova = m.get("questoes_prova", 10.0)
+            peso_questao = m.get("peso_questao", 1.0)
+            dificuldade = m.get("dificuldade", 1.0)
+            
+            fator = (questoes_prova * peso_questao) * dificuldade
+            fator_total += fator
+            
+            materias_calculadas.append({
+                "nome": m["nome"],
+                "questoes_prova": questoes_prova,
+                "peso_questao": peso_questao,
+                "dificuldade": dificuldade,
+                "fator": fator
+            })
 
-    # Ordena as matérias por fator decrescente (mais horas primeiro)
-    materias_calculadas.sort(key=lambda x: x["fator"], reverse=True)
+        # Ordena as matérias por fator decrescente (mais horas primeiro)
+        materias_calculadas.sort(key=lambda x: x["fator"], reverse=True)
 
-    # Desenho da Tabela de Progresso
-    border_top = C_CYAN + "┌" + "─"*(w_materia+2) + "┬" + "─"*(w_quest+2) + "┬" + "─"*(w_peso+2) + "┬" + "─"*(w_dif+2) + "┬" + "─"*(w_meta+2) + "┬" + "─"*(w_estudado+2) + "┬" + "─"*(w_restante+2) + "┐" + C_RESET
-    border_mid = C_CYAN + "├" + "─"*(w_materia+2) + "┼" + "─"*(w_quest+2) + "┼" + "─"*(w_peso+2) + "┼" + "─"*(w_dif+2) + "┼" + "─"*(w_meta+2) + "┼" + "─"*(w_estudado+2) + "┼" + "─"*(w_restante+2) + "┤" + C_RESET
-    border_bot = C_CYAN + "└" + "─"*(w_materia+2) + "┴" + "─"*(w_quest+2) + "┴" + "─"*(w_peso+2) + "┴" + "─"*(w_dif+2) + "┴" + "─"*(w_meta+2) + "┴" + "─"*(w_estudado+2) + "┴" + "─"*(w_restante+2) + "┘" + C_RESET
+        # Desenho da Tabela de Progresso
+        border_top = C_CYAN + "┌" + "─"*(w_materia+2) + "┬" + "─"*(w_quest+2) + "┬" + "─"*(w_peso+2) + "┬" + "─"*(w_dif+2) + "┬" + "─"*(w_meta+2) + "┬" + "─"*(w_estudado+2) + "┬" + "─"*(w_restante+2) + "┐" + C_RESET
+        border_mid = C_CYAN + "├" + "─"*(w_materia+2) + "┼" + "─"*(w_quest+2) + "┼" + "─"*(w_peso+2) + "┼" + "─"*(w_dif+2) + "┼" + "─"*(w_meta+2) + "┼" + "─"*(w_estudado+2) + "┼" + "─"*(w_restante+2) + "┤" + C_RESET
+        border_bot = C_CYAN + "└" + "─"*(w_materia+2) + "┴" + "─"*(w_quest+2) + "┴" + "─"*(w_peso+2) + "┴" + "─"*(w_dif+2) + "┴" + "─"*(w_meta+2) + "┴" + "─"*(w_estudado+2) + "┴" + "─"*(w_restante+2) + "┘" + C_RESET
 
-    header = (
-        C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_materia}} " +
-        C_CYAN + "│" + C_RESET + f" {'Quest.':>{w_quest}} " +
-        C_CYAN + "│" + C_RESET + f" {'Peso Q.':>{w_peso}} " +
-        C_CYAN + "│" + C_RESET + f" {'Dif':>{w_dif}} " +
-        C_CYAN + "│" + C_RESET + f" {'Meta':>{w_meta}} " +
-        C_CYAN + "│" + C_RESET + f" {'Estudado':>{w_estudado}} " +
-        C_CYAN + "│" + C_RESET + f" {'Restante':>{w_restante}} " +
-        C_CYAN + "│"
-    )
-
-    print(border_top)
-    print(header)
-    print(border_mid)
-    
-    for mc in materias_calculadas:
-        pct = (mc["fator"] / fator_total) if fator_total > 0 else 0
-        meta_horas = pct * horas_totais
-        
-        estudado_horas = progresso.get(mc["nome"], 0.0)
-        restante_horas = max(0.0, meta_horas - estudado_horas)
-        
-        meta_formatada = formatar_horas_minutos(meta_horas)
-        estudado_formatada = formatar_horas_minutos(estudado_horas)
-        
-        # Formata o restante com indicativo visual de concluído
-        if restante_horas <= 0.00027:  # Limiar de 1 segundo de margem
-            restante_formatada = "Concluído"
-        else:
-            restante_formatada = formatar_horas_minutos(restante_horas)
-        
-        restante_exibicao = f"{C_GREEN}{restante_formatada:>{w_restante}}{C_RESET}" if restante_formatada == "Concluído" else f"{restante_formatada:>{w_restante}}"
-        
-        print(
-            C_CYAN + "│" + C_RESET + f" {mc['nome']:<{w_materia}} " +
-            C_CYAN + "│" + C_RESET + f" {mc['questoes_prova']:>{w_quest}.1f} " +
-            C_CYAN + "│" + C_RESET + f" {mc['peso_questao']:>{w_peso}.1f} " +
-            C_CYAN + "│" + C_RESET + f" {mc['dificuldade']:>{w_dif}.1f} " +
-            C_CYAN + "│" + C_RESET + f" {meta_formatada:>{w_meta}} " +
-            C_CYAN + "│" + C_RESET + f" {estudado_formatada:>{w_estudado}} " +
-            C_CYAN + "│" + C_RESET + f" {restante_exibicao} " +
+        header = (
+            C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_materia}} " +
+            C_CYAN + "│" + C_RESET + f" {'Quest.':>{w_quest}} " +
+            C_CYAN + "│" + C_RESET + f" {'Peso Q.':>{w_peso}} " +
+            C_CYAN + "│" + C_RESET + f" {'Dif':>{w_dif}} " +
+            C_CYAN + "│" + C_RESET + f" {'Meta':>{w_meta}} " +
+            C_CYAN + "│" + C_RESET + f" {'Estudado':>{w_estudado}} " +
+            C_CYAN + "│" + C_RESET + f" {'Restante':>{w_restante}} " +
             C_CYAN + "│"
         )
 
-    print(border_bot)
-    
-    # Progresso Geral do Ciclo
-    total_estudado = sum(progresso.values())
-    pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0
-    total_estudado_f = formatar_horas_minutos(total_estudado)
-    horas_totais_f = formatar_horas_minutos(horas_totais)
-    print(f"\n{C_BOLD}Progresso Geral do Ciclo:{C_RESET} {C_GREEN}{total_estudado_f} / {horas_totais_f} ({pct_concluido:.1f}% concluído){C_RESET}")
-    print(f"{C_BOLD}Fator de Relevância Total:{C_RESET} {fator_total:.1f}")
-    
-    if pausar:
-        print(C_CYAN + "─" * largura_tabela + C_RESET)
-        input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
+        print(border_top)
+        print(header)
+        print(border_mid)
+        
+        for mc in materias_calculadas:
+            pct = (mc["fator"] / fator_total) if fator_total > 0 else 0
+            meta_horas = pct * horas_totais
+            
+            estudado_horas = progresso.get(mc["nome"], 0.0)
+            restante_horas = max(0.0, meta_horas - estudado_horas)
+            
+            meta_formatada = formatar_horas_minutos(meta_horas)
+            estudado_formatada = formatar_horas_minutos(estudado_horas)
+            
+            # Formata o restante com indicativo visual de concluído
+            if restante_horas <= 0.00027:  # Limiar de 1 segundo de margem
+                restante_formatada = "Concluído"
+            else:
+                restante_formatada = formatar_horas_minutos(restante_horas)
+            
+            restante_exibicao = f"{C_GREEN}{restante_formatada:>{w_restante}}{C_RESET}" if restante_formatada == "Concluído" else f"{restante_formatada:>{w_restante}}"
+            
+            print(
+                C_CYAN + "│" + C_RESET + f" {mc['nome']:<{w_materia}} " +
+                C_CYAN + "│" + C_RESET + f" {mc['questoes_prova']:>{w_quest}.1f} " +
+                C_CYAN + "│" + C_RESET + f" {mc['peso_questao']:>{w_peso}.1f} " +
+                C_CYAN + "│" + C_RESET + f" {mc['dificuldade']:>{w_dif}.1f} " +
+                C_CYAN + "│" + C_RESET + f" {meta_formatada:>{w_meta}} " +
+                C_CYAN + "│" + C_RESET + f" {estudado_formatada:>{w_estudado}} " +
+                C_CYAN + "│" + C_RESET + f" {restante_exibicao} " +
+                C_CYAN + "│"
+            )
+
+        print(border_bot)
+        
+        # Progresso Geral do Ciclo
+        total_estudado = sum(progresso.values())
+        pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0
+        total_estudado_f = formatar_horas_minutos(total_estudado)
+        horas_totais_f = formatar_horas_minutos(horas_totais)
+        print(f"\n{C_BOLD}Progresso Geral do Ciclo:{C_RESET} {C_GREEN}{total_estudado_f} / {horas_totais_f} ({pct_concluido:.1f}% concluído){C_RESET}")
+        print(f"{C_BOLD}Fator de Relevância Total:{C_RESET} {fator_total:.1f}")
+        
+        if pausar:
+            print(C_CYAN + "─" * largura_tabela + C_RESET)
+            input(f"Pressione {C_GREEN}Enter{C_RESET} para voltar ao menu...")
+    finally:
+        reset_largura_atual()
 
 def adicionar_materia(dados):
     """Permite adicionar uma nova matéria ao ciclo."""
@@ -1192,7 +1196,7 @@ def menu_materias(dados):
         except KeyboardInterrupt:
             break
 
-def verificar_atualizacao(dados):
+def executar_verificacao_manual(dados):
     """Verifica se há atualizações do script no GitHub e atualiza via git pull."""
     import urllib.request
     import subprocess
@@ -1269,3 +1273,94 @@ def verificar_atualizacao(dados):
     else:
         print(f"\n{C_YELLOW}Atualização cancelada.{C_RESET}")
         input("\nPressione Enter para retornar...")
+
+def verificar_atualizacao(dados):
+    """Menu para gerenciar e configurar atualizações do script."""
+    while True:
+        clear_screen()
+        print_header("ATUALIZAÇÕES DO SCRIPT")
+        
+        status_auto = "ATIVADO" if dados.get("atualizacao_automatica", True) else "DESATIVADO"
+        cor_status = C_GREEN if dados.get("atualizacao_automatica", True) else C_RED
+        
+        print(f"  [{C_CYAN}1{C_RESET}] 🔍 Verificar Atualizações Manualmente")
+        print(f"  [{C_CYAN}2{C_RESET}] 🔄 Atualizações Automáticas ao Iniciar: {cor_status}{status_auto}{C_RESET}")
+        print(f"  [{C_CYAN}0{C_RESET}] ↩️  Voltar ao Menu Principal")
+        print_divider()
+        
+        opcao = input("Escolha uma opção: ").strip()
+        
+        if opcao == "1":
+            executar_verificacao_manual(dados)
+        elif opcao == "2":
+            dados["atualizacao_automatica"] = not dados.get("atualizacao_automatica", True)
+            salvar_dados(dados)
+            status_str = "ATIVADAS" if dados["atualizacao_automatica"] else "DESATIVADAS"
+            cor_msg = C_GREEN if dados["atualizacao_automatica"] else C_YELLOW
+            print(f"\n{cor_msg}✔ Atualizações automáticas {status_str} com sucesso!{C_RESET}")
+            input("\nPressione Enter para continuar...")
+        elif opcao == "0":
+            break
+        else:
+            print(f"\n{C_RED}Opção inválida!{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+
+def verificar_atualizacao_automatica(dados):
+    """Verifica e executa a atualização automática do script se ativada."""
+    import urllib.request
+    import subprocess
+    import sys
+    import os
+
+    # 1. Verifica se a atualização automática está ativa
+    if not dados.get("atualizacao_automatica", True):
+        return
+
+    # 2. Obter versão local silenciosamente
+    versao_local = "1.0.0"
+    if os.path.exists("version.txt"):
+        try:
+            with open("version.txt", "r", encoding="utf-8") as f:
+                versao_local = f.read().strip()
+        except Exception:
+            return
+
+    # 3. Obter versão remota silenciosamente
+    url_remota = "https://raw.githubusercontent.com/nissincjs/Gerencicador-de-estudos/main/version.txt"
+    try:
+        req = urllib.request.Request(url_remota, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            versao_remota = response.read().decode('utf-8').strip()
+    except Exception:
+        # Se falhar a conexão (sem internet), ignora silenciosamente
+        return
+
+    # 4. Comparar versões
+    if versao_local == versao_remota:
+        return
+
+    # 5. Nova versão disponível - Atualiza automaticamente
+    clear_screen()
+    print_header("ATUALIZAÇÃO AUTOMÁTICA DETECTADA")
+    print(f"\nUma nova versão do script está disponível!")
+    print(f"  • Versão Local:  {C_RED}{versao_local}{C_RESET}")
+    print(f"  • Versão Remota: {C_GREEN}{versao_remota}{C_RESET}")
+    print_divider()
+    print(f"\n{C_CYAN}Atualizando o script automaticamente via 'git pull'...{C_RESET}\n")
+
+    try:
+        # Tenta executar o git pull
+        resultado = subprocess.run(["git", "pull"], capture_output=True, text=True, check=True)
+        print(f"{C_GREEN}✔ Atualização concluída com sucesso!{C_RESET}")
+        if resultado.stdout:
+            print(f"{C_CYAN}Saída do Git:{C_RESET}\n{resultado.stdout}")
+        
+        print(f"\n{C_YELLOW}A aplicação foi atualizada automaticamente e será encerrada.{C_RESET}")
+        print(f"{C_YELLOW}Por favor, inicie o script novamente para aplicar as mudanças.{C_RESET}")
+        input("\nPressione Enter para fechar...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"{C_RED}Erro ao tentar atualizar automaticamente:{C_RESET} {e}")
+        print(f"Você pode tentar atualizar manualmente selecionando a opção 5 no menu principal.")
+        input("\nPressione Enter para continuar para o aplicativo...")
+

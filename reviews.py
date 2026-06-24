@@ -5,7 +5,8 @@ from constants import (
 )
 from utils import (
     clear_screen, print_header, print_divider,
-    obter_input_float, obter_input_str
+    obter_input_float, obter_input_str,
+    print_override as print, input_override as input
 )
 from database import salvar_dados, obter_fator
 
@@ -293,53 +294,58 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
     
     largura_tabela = w_id + w_mat + w_ass + w_data + w_pct + w_prox + w_stat + 22
     
-    print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
-    print(f"║{C_CYAN}{titulo.center(largura_tabela - 2)}{C_RESET}║")
-    print("╚" + "═" * (largura_tabela - 2) + "╝")
-    border_top = C_CYAN + "┌" + "─"*(w_id+2) + "┬" + "─"*(w_mat+2) + "┬" + "─"*(w_ass+2) + "┬" + "─"*(w_data+2) + "┬" + "─"*(w_pct+2) + "┬" + "─"*(w_prox+2) + "┬" + "─"*(w_stat+2) + "┐" + C_RESET
-    border_mid = C_CYAN + "├" + "─"*(w_id+2) + "┼" + "─"*(w_mat+2) + "┼" + "─"*(w_ass+2) + "┼" + "─"*(w_data+2) + "┼" + "─"*(w_pct+2) + "┼" + "─"*(w_prox+2) + "┼" + "─"*(w_stat+2) + "┤" + C_RESET
-    border_bot = C_CYAN + "└" + "─"*(w_id+2) + "┴" + "─"*(w_mat+2) + "┴" + "─"*(w_ass+2) + "┴" + "─"*(w_data+2) + "┴" + "─"*(w_pct+2) + "┴" + "─"*(w_prox+2) + "┴" + "─"*(w_stat+2) + "┘" + C_RESET
-    
-    header = (
-        C_CYAN + "│" + C_RESET + f" {'ID':<{w_id}} " +
-        C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_mat}} " +
-        C_CYAN + "│" + C_RESET + f" {'Assunto':<{w_ass}} " +
-        C_CYAN + "│" + C_RESET + f" {'Últ. Est.':<{w_data}} " +
-        C_CYAN + "│" + C_RESET + f" {'%':>{w_pct}} " +
-        C_CYAN + "│" + C_RESET + f" {'Próx. Rev.':<{w_prox}} " +
-        C_CYAN + "│" + C_RESET + f" {'Status':<{w_stat}} " +
-        C_CYAN + "│"
-    )
-    
-    print(border_top)
-    print(header)
-    print(border_mid)
-    
-    for r in lista_revisoes:
-        pct_str = f"{r['acertos_pct']:.1f}%" if r['acertos_pct'] is not None else "N/A"
-        status_str, _ = calcular_status_e_dias(r['data_proxima_revisao'])
+    import utils
+    utils.set_largura_atual(largura_tabela)
+    try:
+        print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
+        print(f"║{C_CYAN}{titulo.center(largura_tabela - 2)}{C_RESET}║")
+        print("╚" + "═" * (largura_tabela - 2) + "╝")
+        border_top = C_CYAN + "┌" + "─"*(w_id+2) + "┬" + "─"*(w_mat+2) + "┬" + "─"*(w_ass+2) + "┬" + "─"*(w_data+2) + "┬" + "─"*(w_pct+2) + "┬" + "─"*(w_prox+2) + "┬" + "─"*(w_stat+2) + "┐" + C_RESET
+        border_mid = C_CYAN + "├" + "─"*(w_id+2) + "┼" + "─"*(w_mat+2) + "┼" + "─"*(w_ass+2) + "┼" + "─"*(w_data+2) + "┼" + "─"*(w_pct+2) + "┼" + "─"*(w_prox+2) + "┼" + "─"*(w_stat+2) + "┤" + C_RESET
+        border_bot = C_CYAN + "└" + "─"*(w_id+2) + "┴" + "─"*(w_mat+2) + "┴" + "─"*(w_ass+2) + "┴" + "─"*(w_data+2) + "┴" + "─"*(w_pct+2) + "┴" + "─"*(w_prox+2) + "┴" + "─"*(w_stat+2) + "┘" + C_RESET
         
-        mat_exibicao = r['materia']
-        ass_exibicao = r['assunto']
-        
-        # Corrige o padding considerando que o status_str pode conter caracteres de escape ANSI de cor
-        clean_status = re.sub(r'\033\[[0-9;]*m', '', status_str)
-        padding_len = w_stat - len(clean_status)
-        status_exibicao = status_str + " " * max(0, padding_len)
-        
-        print(
-            C_CYAN + "│" + C_RESET + f" {r['id']:<{w_id}} " +
-            C_CYAN + "│" + C_RESET + f" {mat_exibicao:<{w_mat}} " +
-            C_CYAN + "│" + C_RESET + f" {ass_exibicao:<{w_ass}} " +
-            C_CYAN + "│" + C_RESET + f" {r['data_ultimo_estudo']:<{w_data}} " +
-            C_CYAN + "│" + C_RESET + f" {pct_str:>{w_pct}} " +
-            C_CYAN + "│" + C_RESET + f" {r['data_proxima_revisao']:<{w_prox}} " +
-            C_CYAN + "│" + C_RESET + f" {status_exibicao} " +
+        header = (
+            C_CYAN + "│" + C_RESET + f" {'ID':<{w_id}} " +
+            C_CYAN + "│" + C_RESET + f" {'Matéria':<{w_mat}} " +
+            C_CYAN + "│" + C_RESET + f" {'Assunto':<{w_ass}} " +
+            C_CYAN + "│" + C_RESET + f" {'Últ. Est.':<{w_data}} " +
+            C_CYAN + "│" + C_RESET + f" {'%':>{w_pct}} " +
+            C_CYAN + "│" + C_RESET + f" {'Próx. Rev.':<{w_prox}} " +
+            C_CYAN + "│" + C_RESET + f" {'Status':<{w_stat}} " +
             C_CYAN + "│"
         )
         
-    print(border_bot)
-    return True
+        print(border_top)
+        print(header)
+        print(border_mid)
+        
+        for r in lista_revisoes:
+            pct_str = f"{r['acertos_pct']:.1f}%" if r['acertos_pct'] is not None else "N/A"
+            status_str, _ = calcular_status_e_dias(r['data_proxima_revisao'])
+            
+            mat_exibicao = r['materia']
+            ass_exibicao = r['assunto']
+            
+            # Corrige o padding considerando que o status_str pode conter caracteres de escape ANSI de cor
+            clean_status = re.sub(r'\033\[[0-9;]*m', '', status_str)
+            padding_len = w_stat - len(clean_status)
+            status_exibicao = status_str + " " * max(0, padding_len)
+            
+            print(
+                C_CYAN + "│" + C_RESET + f" {r['id']:<{w_id}} " +
+                C_CYAN + "│" + C_RESET + f" {mat_exibicao:<{w_mat}} " +
+                C_CYAN + "│" + C_RESET + f" {ass_exibicao:<{w_ass}} " +
+                C_CYAN + "│" + C_RESET + f" {r['data_ultimo_estudo']:<{w_data}} " +
+                C_CYAN + "│" + C_RESET + f" {pct_str:>{w_pct}} " +
+                C_CYAN + "│" + C_RESET + f" {r['data_proxima_revisao']:<{w_prox}} " +
+                C_CYAN + "│" + C_RESET + f" {status_exibicao} " +
+                C_CYAN + "│"
+            )
+            
+        print(border_bot)
+        return True
+    finally:
+        utils.reset_largura_atual()
 
 def adicionar_revisao(dados):
     """Permite adicionar uma nova revisão vinculada a uma matéria do ciclo."""

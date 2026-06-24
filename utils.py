@@ -5,69 +5,179 @@ from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
 
-def obter_largura_ui():
-    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 80, max 100)."""
+def obter_largura_ui(largura_max=None):
+    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 80)."""
     try:
         cols = shutil.get_terminal_size((80, 20)).columns
-        return max(80, min(100, cols))
+        limite_superior = largura_max if largura_max is not None else cols - 4
+        return max(80, min(limite_superior, cols - 4))
     except Exception:
         return 80
+
+_largura_atual = 80
+_largura_manual = False
+
+def atualizar_largura_dinamica():
+    global _largura_atual
+    if not _largura_manual:
+        try:
+            cols = shutil.get_terminal_size((80, 20)).columns
+            _largura_atual = max(80, cols - 4)
+        except Exception:
+            _largura_atual = 80
+
+def obter_margem_esquerda(largura_conteudo=None):
+    """Retorna a margem esquerda (espaços em branco) para centralizar um conteúdo no terminal."""
+    if largura_conteudo is None:
+        atualizar_largura_dinamica()
+        largura_conteudo = _largura_atual
+    try:
+        cols = shutil.get_terminal_size((80, 20)).columns
+        if cols > largura_conteudo:
+            return " " * ((cols - largura_conteudo) // 2)
+    except Exception:
+        pass
+    return ""
+
+def set_largura_atual(largura):
+    global _largura_atual, _largura_manual
+    _largura_atual = largura
+    _largura_manual = True
+
+def reset_largura_atual():
+    global _largura_atual, _largura_manual
+    _largura_atual = 80
+    _largura_manual = False
+
+def print_override(*args, **kwargs):
+    atualizar_largura_dinamica()
+    margin = obter_margem_esquerda(_largura_atual)
+    import builtins
+    if args:
+        val = str(args[0])
+        if "\n" in val:
+            lines = val.split("\n")
+            val = "\n".join((margin + line if line.strip() or idx == 0 else line) for idx, line in enumerate(lines))
+            new_args = (val,) + args[1:]
+        else:
+            new_args = (margin + val,) + args[1:]
+        builtins.print(*new_args, **kwargs)
+    else:
+        builtins.print(margin, **kwargs)
+
+def _formatar_prompt(prompt, margin):
+    if not prompt:
+        return margin
+    val = str(prompt)
+    if "\n" in val:
+        lines = val.split("\n")
+        return "\n".join((margin + line if line.strip() or idx == 0 else line) for idx, line in enumerate(lines))
+    else:
+        return margin + val
+
+def input_override(prompt=""):
+    atualizar_largura_dinamica()
+    margin = obter_margem_esquerda(_largura_atual)
+    import builtins
+    return builtins.input(_formatar_prompt(prompt, margin))
+
+def print_l(texto, largura_ref=None):
+    """Imprime uma linha de texto adicionando a margem esquerda para centralização."""
+    atualizar_largura_dinamica()
+    if largura_ref is None:
+        largura_ref = _largura_atual
+    margin = obter_margem_esquerda(largura_ref)
+    print(margin + texto)
+
+def input_l(prompt, largura_ref=None):
+    """Lê do input padrão com a margem esquerda apropriada para alinhamento."""
+    atualizar_largura_dinamica()
+    if largura_ref is None:
+        largura_ref = _largura_atual
+    margin = obter_margem_esquerda(largura_ref)
+    return input(margin + prompt)
 
 def clear_screen():
     """Limpa a tela do terminal."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def print_header(title):
-    """Exibe um cabeçalho estilizado com bordas duplas (largura dinâmica)."""
-    width = obter_largura_ui()
-    print(C_CYAN + "╔" + "═" * (width - 2) + "╗")
-    print(f"║{title.center(width - 2)}║")
-    print("╚" + "═" * (width - 2) + "╝" + C_RESET)
+def print_header(title, width=None):
+    """Exibe um cabeçalho estilizado com bordas duplas (largura fixa ou dinâmica, centralizado)."""
+    atualizar_largura_dinamica()
+    if width is None:
+        width = _largura_atual
+    width = max(80, width)
+    margin = obter_margem_esquerda(width)
+    import builtins
+    builtins.print(margin + C_CYAN + "╔" + "═" * (width - 2) + "╗")
+    builtins.print(margin + f"║{title.center(width - 2)}║")
+    builtins.print(margin + "╚" + "═" * (width - 2) + "╝" + C_RESET)
 
-def print_divider():
-    """Exibe uma linha divisória sólida em ciano (largura dinâmica)."""
-    print(C_CYAN + "─" * obter_largura_ui() + C_RESET)
+def print_divider(width=None):
+    """Exibe uma linha divisória sólida em ciano (largura dinâmica ou fixa, centralizada)."""
+    atualizar_largura_dinamica()
+    if width is None:
+        width = _largura_atual
+    width = max(80, width)
+    margin = obter_margem_esquerda(width)
+    import builtins
+    builtins.print(margin + C_CYAN + "─" * width + C_RESET)
 
-def mostrar_guia_dificuldade():
-    """Exibe uma legenda explicativa sobre os níveis de dificuldade com base em acertos."""
-    inner_width = obter_largura_ui() - 2
-    print(C_YELLOW + "┌" + "─" * inner_width + "┐")
-    print("│" + " GUIA DE ESTIMATIVA DE DIFICULDADE (Baseado em acertos):".ljust(inner_width) + "│")
-    print("│" + "   1 - Ótimo domínio (>85% de acertos em questões)".ljust(inner_width) + "│")
-    print("│" + "   2 - Bom domínio (75% - 85% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   3 - Domínio médio (60% - 75% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   4 - Baixo rendimento (45% - 60% de acertos)".ljust(inner_width) + "│")
-    print("│" + "   5 - Sem base ou assunto novo (<45% de acertos)".ljust(inner_width) + "│")
-    print("└" + "─" * inner_width + "┘" + C_RESET)
+def mostrar_guia_dificuldade(largura_ref=None):
+    """Exibe uma legenda explicativa sobre os níveis de dificuldade com base em acertos (centralizada)."""
+    atualizar_largura_dinamica()
+    if largura_ref is None:
+        largura_ref = _largura_atual
+    margin = obter_margem_esquerda(largura_ref)
+    inner_width = largura_ref - 2
+    import builtins
+    builtins.print(margin + C_YELLOW + "┌" + "─" * inner_width + "┐")
+    builtins.print(margin + "│" + " GUIA DE ESTIMATIVA DE DIFICULDADE (Baseado em acertos):".ljust(inner_width) + "│")
+    builtins.print(margin + "│" + "   1 - Ótimo domínio (>85% de acertos em questões)".ljust(inner_width) + "│")
+    builtins.print(margin + "│" + "   2 - Bom domínio (75% - 85% de acertos)".ljust(inner_width) + "│")
+    builtins.print(margin + "│" + "   3 - Domínio médio (60% - 75% de acertos)".ljust(inner_width) + "│")
+    builtins.print(margin + "│" + "   4 - Baixo rendimento (45% - 60% de acertos)".ljust(inner_width) + "│")
+    builtins.print(margin + "│" + "   5 - Sem base ou assunto novo (<45% de acertos)".ljust(inner_width) + "│")
+    builtins.print(margin + "└" + "─" * inner_width + "┘" + C_RESET)
 
-def obter_input_float(prompt, min_val=None, max_val=None, default=None):
-    """Lê e valida uma entrada decimal."""
+def obter_input_float(prompt, min_val=None, max_val=None, default=None, largura_ref=None):
+    """Lê e valida uma entrada decimal (alinhada à margem esquerda)."""
+    atualizar_largura_dinamica()
+    if largura_ref is None:
+        largura_ref = _largura_atual
+    margin = obter_margem_esquerda(largura_ref)
+    import builtins
     while True:
         try:
-            entrada = input(prompt).strip()
+            entrada = builtins.input(_formatar_prompt(prompt, margin)).strip()
             if not entrada and default is not None:
                 return default
             val = float(entrada)
             if min_val is not None and val < min_val:
-                print(f"{C_RED}Erro: O valor deve ser no mínimo {min_val}.{C_RESET}")
+                builtins.print(margin + f"{C_RED}Erro: O valor deve ser no mínimo {min_val}.{C_RESET}")
                 continue
             if max_val is not None and val > max_val:
-                print(f"{C_RED}Erro: O valor não deve ultrapassar {max_val}.{C_RESET}")
+                builtins.print(margin + f"{C_RED}Erro: O valor não deve ultrapassar {max_val}.{C_RESET}")
                 continue
             return val
         except ValueError:
-            print(f"{C_RED}Erro: Por favor, insira um número válido.{C_RESET}")
+            builtins.print(margin + f"{C_RED}Erro: Por favor, insira um número válido.{C_RESET}")
 
-def obter_input_str(prompt, obrigatorio=True, default=None):
-    """Lê e valida uma entrada de texto."""
+def obter_input_str(prompt, obrigatorio=True, default=None, largura_ref=None):
+    """Lê e valida uma entrada de texto (alinhada à margem esquerda)."""
+    atualizar_largura_dinamica()
+    if largura_ref is None:
+        largura_ref = _largura_atual
+    margin = obter_margem_esquerda(largura_ref)
+    import builtins
     while True:
-        entrada = input(prompt).strip()
+        entrada = builtins.input(_formatar_prompt(prompt, margin)).strip()
         if not entrada:
             if default is not None:
                 return default
             if not obrigatorio:
                 return ""
-            print(f"{C_RED}Erro: Este campo não pode ficar vazio.{C_RESET}")
+            builtins.print(margin + f"{C_RED}Erro: Este campo não pode ficar vazio.{C_RESET}")
             continue
         return entrada
 

@@ -71,6 +71,10 @@ def carregar_dados():
                         r["historico_ease_factors"] = [r.get("ease_factor", 2.5)]
                         migrou = True
                 
+                if "atualizacao_automatica" not in dados:
+                    dados["atualizacao_automatica"] = True
+                    migrou = True
+                
                 if migrou:
                     salvar_dados(dados)
                     
@@ -90,7 +94,8 @@ def carregar_dados():
         "historico_ciclos": [],
         "historico_sessoes": [],
         "revisoes": [],
-        "justificativas": []
+        "justificativas": [],
+        "atualizacao_automatica": True
     }
 
 def salvar_local(dados):

@@ -5,7 +5,8 @@ from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
 from utils import (
-    clear_screen, print_header, print_divider, obter_input_str, formatar_horas_minutos, obter_input_float
+    clear_screen, print_header, print_divider, obter_input_str, formatar_horas_minutos, obter_input_float,
+    print_override as print, input_override as input
 )
 from database import salvar_dados
 

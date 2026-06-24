@@ -4,16 +4,25 @@ from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET, DB_FILE
 )
 from utils import (
-    clear_screen, print_header, print_divider, formatar_horas_minutos
+    clear_screen, print_header, print_divider, formatar_horas_minutos,
+    print_override as print, input_override as input
 )
 from database import carregar_dados, salvar_local, sincronizar_pendencias
 from actions import (
     menu_ciclo_progresso, menu_materias, exibir_historico,
-    configuracao_inicial, verificar_atualizacao
+    configuracao_inicial, verificar_atualizacao, verificar_atualizacao_automatica
 )
 from reviews import menu_revisoes
 import os
 import partner_menu
+
+# Override getpass to support centering margin automatically
+_original_getpass = getpass.getpass
+def getpass_override(prompt="Password: ", stream=None):
+    import utils
+    margin = utils.obter_margem_esquerda(utils._largura_atual)
+    return _original_getpass(margin + prompt, stream=stream)
+getpass.getpass = getpass_override
 
 def limpar_meta_dados(dados: dict) -> dict:
     """Retorna uma cópia limpa dos dados sem campos de controle/timestamp."""
@@ -210,6 +219,9 @@ def main():
 
     # Tenta sincronizar pendências imediatamente ao abrir
     sincronizar_pendencias(dados)
+    
+    # Executa a verificação e atualização automática na inicialização
+    verificar_atualizacao_automatica(dados)
     
     # Se for o primeiro acesso (sem horas configuradas e sem matérias)
     if dados["horas_semanais"] == 0.0 and not dados["materias"]:
