@@ -139,8 +139,8 @@ source venv/bin/activate
 echo -e "Verificando dependências do Python..."
 
 # No Termux, o pip não reconhece as wheels linux_aarch64 como compatíveis com
-# aarch64-linux-android. Solução: baixar a wheel diretamente do GitHub e instalar
-# forçando a aceitação, contornando a verificação de plataforma do pip.
+# aarch64-linux-android. Solução: baixar a wheel (.whl = ZIP) diretamente do
+# GitHub e extraí-la no site-packages do venv, contornando 100% as verificações.
 if [ "$IS_TERMUX" = true ]; then
     echo -e "Preparando dependências compatíveis com Termux (evitando compilação Rust)..."
 
@@ -148,6 +148,8 @@ if [ "$IS_TERMUX" = true ]; then
     PY_VER=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
     # Detectar arquitetura (ex: aarch64, armv7l, x86_64, i686)
     ARCH=$(uname -m)
+    # Obter caminho do site-packages do venv
+    SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
 
     PYDANTIC_CORE_VER="2.41.5"
     WHEEL_NAME="pydantic_core-${PYDANTIC_CORE_VER}-${PY_VER}-${PY_VER}-linux_${ARCH}.whl"
@@ -160,11 +162,15 @@ if [ "$IS_TERMUX" = true ]; then
         echo -e "Baixando pydantic-core ${PYDANTIC_CORE_VER} pré-compilado para ${ARCH}..."
         curl -sL -o "$WHEEL_PATH" "$WHEEL_URL"
         if [ $? -eq 0 ] && [ -f "$WHEEL_PATH" ]; then
-            echo -e "Instalando pydantic-core a partir da wheel pré-compilada..."
-            pip install --disable-pip-version-check -q --force-reinstall "$WHEEL_PATH"
+            echo -e "Extraindo pydantic-core no ambiente virtual..."
+            # Uma .whl é um ZIP — extrair direto no site-packages contorna
+            # a verificação de plataforma do pip completamente
+            unzip -qo "$WHEEL_PATH" -d "$SITE_PACKAGES"
             rm -f "$WHEEL_PATH"
-            if [ $? -ne 0 ]; then
-                echo -e "\033[93mAviso: Falha ao instalar pydantic-core da wheel. Tentando continuar...\033[0m"
+            if [ $? -eq 0 ]; then
+                echo -e "\033[92m✔ pydantic-core ${PYDANTIC_CORE_VER} instalado com sucesso!\033[0m"
+            else
+                echo -e "\033[93mAviso: Falha ao extrair pydantic-core. Tentando continuar...\033[0m"
             fi
         else
             echo -e "\033[93mAviso: Não foi possível baixar a wheel de pydantic-core. Tentando continuar...\033[0m"
@@ -172,7 +178,7 @@ if [ "$IS_TERMUX" = true ]; then
 
         # Instalar pydantic na versão compatível com o pydantic-core pré-compilado
         echo -e "Instalando pydantic==2.12.5 (compatível com pydantic-core ${PYDANTIC_CORE_VER})..."
-        pip install --disable-pip-version-check -q "pydantic==2.12.5"
+        pip install --disable-pip-version-check -q --no-deps "pydantic==2.12.5" "annotated-types>=0.6.0" "typing-extensions>=4.12.0"
     else
         echo -e "pydantic-core ${PYDANTIC_CORE_VER} já instalado."
     fi
