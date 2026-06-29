@@ -17,4 +17,7 @@ __pycache__/
 .env
 .session.json
 
-
+# Ambientes virtuais
+venv/
+.venv/
+env/

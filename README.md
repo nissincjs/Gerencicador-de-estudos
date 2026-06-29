@@ -108,19 +108,29 @@ O espaçamento de revisões utiliza o algoritmo **SuperMemo-2 (SM2)** adaptado p
 * Python 3.8 ou superior instalado.
 * Git instalado (necessário para a função de auto-update).
 
-### Instalação
+### Instalação e Execução
+
 1. Clone o repositório para sua máquina local:
    ```bash
    git clone https://github.com/nissincjs/Gerencicador-de-estudos.git
    ```
 2. Navegue até o diretório do projeto:
    ```bash
-   cd "ciclo de estudo"
+   cd Gerencicador-de-estudos
    ```
-3. Execute o programa:
-   ```bash
-   python ciclo.py
-   ```
+3. Execute o script inicializador adequado para o seu sistema (ele criará o ambiente virtual `venv` e instalará todas as dependências automaticamente):
+
+   * **No Windows:**
+     * Dê um duplo-clique no arquivo `iniciar.bat` ou execute no terminal:
+       ```cmd
+       iniciar.bat
+       ```
+   * **No Linux (Mint, Ubuntu, Debian, etc.):**
+     * Execute no terminal:
+       ```bash
+       ./iniciar.sh
+       ```
+
 
 ---
 
