@@ -137,6 +137,17 @@ echo -e "Ativando ambiente virtual..."
 source venv/bin/activate
 
 echo -e "Verificando dependências do Python..."
+
+# No Termux, pré-instalar pydantic com versão compatível com as wheels pré-compiladas
+# disponíveis no repositório Eutalix (pydantic-core==2.41.5 para Python 3.13 aarch64)
+if [ "$IS_TERMUX" = true ]; then
+    echo -e "Pré-instalando Pydantic compatível com Termux (evitando compilação Rust)..."
+    pip install --disable-pip-version-check -q --extra-index-url https://eutalix.github.io/android-pydantic-core/ "pydantic==2.12.5"
+    if [ $? -ne 0 ]; then
+        echo -e "\033[93mAviso: Falha na pré-instalação do Pydantic. Tentando continuar...\033[0m"
+    fi
+fi
+
 if [ "$IS_TERMUX" = true ]; then
     pip install --disable-pip-version-check -q --extra-index-url https://eutalix.github.io/android-pydantic-core/ -r requirements.txt
 else
