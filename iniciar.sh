@@ -138,30 +138,52 @@ source venv/bin/activate
 
 echo -e "Verificando dependências do Python..."
 
-# No Termux, pré-instalar pydantic com versão compatível com as wheels pré-compiladas
-# disponíveis no repositório Eutalix (pydantic-core==2.41.5 para Python 3.13 aarch64)
+# No Termux, o pip não reconhece as wheels linux_aarch64 como compatíveis com
+# aarch64-linux-android. Solução: baixar a wheel diretamente do GitHub e instalar
+# forçando a aceitação, contornando a verificação de plataforma do pip.
 if [ "$IS_TERMUX" = true ]; then
-    echo -e "Pré-instalando Pydantic compatível com Termux (evitando compilação Rust)..."
-    pip install --disable-pip-version-check -q --extra-index-url https://eutalix.github.io/android-pydantic-core/ "pydantic==2.12.5"
-    if [ $? -ne 0 ]; then
-        echo -e "\033[93mAviso: Falha na pré-instalação do Pydantic. Tentando continuar...\033[0m"
+    echo -e "Preparando dependências compatíveis com Termux (evitando compilação Rust)..."
+
+    # Detectar versão do Python (ex: 3.13 -> cp313)
+    PY_VER=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+    # Detectar arquitetura (ex: aarch64, armv7l, x86_64, i686)
+    ARCH=$(uname -m)
+
+    PYDANTIC_CORE_VER="2.41.5"
+    WHEEL_NAME="pydantic_core-${PYDANTIC_CORE_VER}-${PY_VER}-${PY_VER}-linux_${ARCH}.whl"
+    WHEEL_URL="https://github.com/Eutalix/android-pydantic-core/releases/download/v${PYDANTIC_CORE_VER}/${WHEEL_NAME}"
+    WHEEL_PATH="/data/data/com.termux/files/usr/tmp/${WHEEL_NAME}"
+
+    # Verificar se pydantic-core já está instalado na versão correta
+    INSTALLED_PC_VER=$(pip show pydantic-core 2>/dev/null | grep "^Version:" | awk '{print $2}')
+    if [ "$INSTALLED_PC_VER" != "$PYDANTIC_CORE_VER" ]; then
+        echo -e "Baixando pydantic-core ${PYDANTIC_CORE_VER} pré-compilado para ${ARCH}..."
+        curl -sL -o "$WHEEL_PATH" "$WHEEL_URL"
+        if [ $? -eq 0 ] && [ -f "$WHEEL_PATH" ]; then
+            echo -e "Instalando pydantic-core a partir da wheel pré-compilada..."
+            pip install --disable-pip-version-check -q --force-reinstall "$WHEEL_PATH"
+            rm -f "$WHEEL_PATH"
+            if [ $? -ne 0 ]; then
+                echo -e "\033[93mAviso: Falha ao instalar pydantic-core da wheel. Tentando continuar...\033[0m"
+            fi
+        else
+            echo -e "\033[93mAviso: Não foi possível baixar a wheel de pydantic-core. Tentando continuar...\033[0m"
+        fi
+
+        # Instalar pydantic na versão compatível com o pydantic-core pré-compilado
+        echo -e "Instalando pydantic==2.12.5 (compatível com pydantic-core ${PYDANTIC_CORE_VER})..."
+        pip install --disable-pip-version-check -q "pydantic==2.12.5"
+    else
+        echo -e "pydantic-core ${PYDANTIC_CORE_VER} já instalado."
     fi
 fi
 
-if [ "$IS_TERMUX" = true ]; then
-    pip install --disable-pip-version-check -q --extra-index-url https://eutalix.github.io/android-pydantic-core/ -r requirements.txt
-else
-    pip install --disable-pip-version-check -q -r requirements.txt
-fi
-
+# Instalar dependências do requirements.txt
+pip install --disable-pip-version-check -q -r requirements.txt
 if [ $? -ne 0 ]; then
     echo -e "\033[93mAviso: Não foi possível instalar/verificar as dependências pelo pip de forma silenciosa.\033[0m"
     echo -e "Tentando novamente com mais detalhes..."
-    if [ "$IS_TERMUX" = true ]; then
-        pip install --extra-index-url https://eutalix.github.io/android-pydantic-core/ -r requirements.txt
-    else
-        pip install -r requirements.txt
-    fi
+    pip install -r requirements.txt
     if [ $? -ne 0 ]; then
         echo -e "\033[91mErro: Não foi possível instalar as dependências obrigatórias.\033[0m"
         echo -e "Por favor, verifique sua conexão com a internet."
