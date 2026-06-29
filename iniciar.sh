@@ -137,11 +137,20 @@ echo -e "Ativando ambiente virtual..."
 source venv/bin/activate
 
 echo -e "Verificando dependências do Python..."
-pip install --disable-pip-version-check -q -r requirements.txt
+if [ "$IS_TERMUX" = true ]; then
+    pip install --disable-pip-version-check -q --extra-index-url https://eutalix.github.io/android-pydantic-core/ -r requirements.txt
+else
+    pip install --disable-pip-version-check -q -r requirements.txt
+fi
+
 if [ $? -ne 0 ]; then
     echo -e "\033[93mAviso: Não foi possível instalar/verificar as dependências pelo pip de forma silenciosa.\033[0m"
     echo -e "Tentando novamente com mais detalhes..."
-    pip install -r requirements.txt
+    if [ "$IS_TERMUX" = true ]; then
+        pip install --extra-index-url https://eutalix.github.io/android-pydantic-core/ -r requirements.txt
+    else
+        pip install -r requirements.txt
+    fi
     if [ $? -ne 0 ]; then
         echo -e "\033[91mErro: Não foi possível instalar as dependências obrigatórias.\033[0m"
         echo -e "Por favor, verifique sua conexão com a internet."
