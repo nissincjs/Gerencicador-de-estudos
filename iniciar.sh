@@ -134,7 +134,7 @@ fi
 
 # 5. Ativar o ambiente virtual e instalar dependências
 echo -e "Ativando ambiente virtual..."
-source venv/bin/activate
+. venv/bin/activate
 
 echo -e "Verificando dependências do Python..."
 
@@ -145,11 +145,11 @@ if [ "$IS_TERMUX" = true ]; then
     echo -e "Preparando dependências compatíveis com Termux (evitando compilação Rust)..."
 
     # Detectar versão do Python (ex: 3.13 -> cp313)
-    PY_VER=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+    PY_VER=$(venv/bin/python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
     # Detectar arquitetura (ex: aarch64, armv7l, x86_64, i686)
     ARCH=$(uname -m)
     # Obter caminho do site-packages do venv
-    SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+    SITE_PACKAGES=$(venv/bin/python -c "import site; print(site.getsitepackages()[0])")
 
     PYDANTIC_CORE_VER="2.41.5"
     WHEEL_NAME="pydantic_core-${PYDANTIC_CORE_VER}-${PY_VER}-${PY_VER}-linux_${ARCH}.whl"
@@ -157,7 +157,7 @@ if [ "$IS_TERMUX" = true ]; then
     WHEEL_PATH="/data/data/com.termux/files/usr/tmp/${WHEEL_NAME}"
 
     # Verificar se pydantic-core já está instalado na versão correta
-    INSTALLED_PC_VER=$(pip show pydantic-core 2>/dev/null | grep "^Version:" | awk '{print $2}')
+    INSTALLED_PC_VER=$(venv/bin/pip show pydantic-core 2>/dev/null | grep "^Version:" | awk '{print $2}')
     if [ "$INSTALLED_PC_VER" != "$PYDANTIC_CORE_VER" ]; then
         echo -e "Baixando pydantic-core ${PYDANTIC_CORE_VER} pré-compilado para ${ARCH}..."
         curl -sL -o "$WHEEL_PATH" "$WHEEL_URL"
@@ -178,18 +178,18 @@ if [ "$IS_TERMUX" = true ]; then
 
         # Instalar pydantic na versão compatível com o pydantic-core pré-compilado
         echo -e "Instalando pydantic==2.12.5 (compatível com pydantic-core ${PYDANTIC_CORE_VER})..."
-        pip install --disable-pip-version-check -q --no-deps "pydantic==2.12.5" "annotated-types>=0.6.0" "typing-extensions>=4.12.0"
+        venv/bin/pip install --disable-pip-version-check -q --no-deps "pydantic==2.12.5" "annotated-types>=0.6.0" "typing-extensions>=4.12.0"
     else
         echo -e "pydantic-core ${PYDANTIC_CORE_VER} já instalado."
     fi
 fi
 
 # Instalar dependências do requirements.txt
-pip install --disable-pip-version-check -q -r requirements.txt
+venv/bin/pip install --disable-pip-version-check -q -r requirements.txt
 if [ $? -ne 0 ]; then
     echo -e "\033[93mAviso: Não foi possível instalar/verificar as dependências pelo pip de forma silenciosa.\033[0m"
     echo -e "Tentando novamente com mais detalhes..."
-    pip install -r requirements.txt
+    venv/bin/pip install -r requirements.txt
     if [ $? -ne 0 ]; then
         echo -e "\033[91mErro: Não foi possível instalar as dependências obrigatórias.\033[0m"
         echo -e "Por favor, verifique sua conexão com a internet."
@@ -200,7 +200,7 @@ fi
 
 # 6. Executar o script principal
 echo -e "\033[92mIniciando o Ciclo de Estudos...\033[0m\n"
-python ciclo.py
+venv/bin/python ciclo.py
 
 # Caso o programa encerre, desativa o venv
 deactivate
