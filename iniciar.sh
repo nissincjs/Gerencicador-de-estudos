@@ -99,8 +99,8 @@ fi
 # 4. Criar ou validar o ambiente virtual (venv)
 RECREAR_VENV=false
 if [ -d "venv" ]; then
-    if [ ! -f "venv/bin/python" ]; then
-        echo -e "\033[93mAviso: Pasta 'venv' existente foi criada em outro sistema (ex: Windows) ou está corrompida.\033[0m"
+    if [ ! -f "venv/bin/python" ] || [ ! -f "venv/bin/pip" ]; then
+        echo -e "\033[93mAviso: Pasta 'venv' existente foi criada em outro sistema ou está incompleta/corrompida.\033[0m"
         echo -e "Recriando o ambiente virtual para este sistema..."
         rm -rf venv
         RECREAR_VENV=true
@@ -125,8 +125,9 @@ if [ "$RECREAR_VENV" = true ]; then
     else
         $PYTHON_BIN -m venv venv
     fi
-    if [ $? -ne 0 ]; then
-        echo -e "\033[91mErro ao criar o ambiente virtual.\033[0m"
+    if [ $? -ne 0 ] || [ ! -f "venv/bin/pip" ]; then
+        echo -e "\033[91mErro ao criar o ambiente virtual ou o 'pip' não foi instalado no venv.\033[0m"
+        echo -e "Certifique-se de que o pacote 'python3-venv' está corretamente instalado."
         read -p "Pressione Enter para sair..."
         exit 1
     fi
