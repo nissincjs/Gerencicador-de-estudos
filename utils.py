@@ -77,12 +77,20 @@ def print_override(*args, **kwargs):
     import builtins
     if args:
         val = str(args[0])
+        is_r = val.startswith("\r")
+        if is_r:
+            val = val[1:]
+            
         if "\n" in val:
             lines = val.split("\n")
             val = "\n".join((margin + line if line.strip() or idx == 0 else line) for idx, line in enumerate(lines))
-            new_args = (val,) + args[1:]
         else:
-            new_args = (margin + val,) + args[1:]
+            val = margin + val
+            
+        if is_r:
+            val = "\r" + val
+            
+        new_args = (val,) + args[1:]
         builtins.print(*new_args, **kwargs)
     else:
         builtins.print(margin, **kwargs)
