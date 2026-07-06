@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime, timezone
 from constants import DB_FILE, C_RED, C_RESET, C_YELLOW, C_GREEN, C_BOLD
+from utils import print_override as print, input_override as input
 
 def obter_fator(m):
     """Calcula o fator de prioridade da matéria."""

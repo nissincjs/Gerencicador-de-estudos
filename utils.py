@@ -284,52 +284,73 @@ def formatar_horas_minutos(horas_decimais):
     return " ".join(partes)
 
 def ajustar_zoom_console(passos=1):
-    """Ajusta o nível de zoom do terminal enviando atalhos de teclado (Ctrl + +) no Windows."""
-    if os.name != 'nt':
-        return
-    try:
-        import ctypes
+    """Ajusta o nível de zoom do terminal enviando atalhos de teclado (Ctrl + + / Ctrl + Shift + +)."""
+    if os.name == 'nt':
+        try:
+            import ctypes
+            import time
+            user32 = ctypes.windll.user32
+            
+            VK_CONTROL = 0x11
+            VK_OEM_PLUS = 0xBB
+            KEYEVENTF_KEYUP = 0x0002
+            
+            for _ in range(passos):
+                user32.keybd_event(VK_CONTROL, 0, 0, 0)
+                user32.keybd_event(VK_OEM_PLUS, 0, 0, 0)
+                user32.keybd_event(VK_OEM_PLUS, 0, KEYEVENTF_KEYUP, 0)
+                user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+                time.sleep(0.05)
+        except Exception:
+            pass
+    elif os.name == 'posix':
+        import subprocess
         import time
-        user32 = ctypes.windll.user32
-        
-        VK_CONTROL = 0x11
-        VK_OEM_PLUS = 0xBB
-        KEYEVENTF_KEYUP = 0x0002
-        
-        for _ in range(passos):
-            user32.keybd_event(VK_CONTROL, 0, 0, 0)
-            user32.keybd_event(VK_OEM_PLUS, 0, 0, 0)
-            user32.keybd_event(VK_OEM_PLUS, 0, KEYEVENTF_KEYUP, 0)
-            user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
-            time.sleep(0.05)
-    except Exception:
-        pass
+        if shutil.which('xdotool'):
+            try:
+                for _ in range(passos):
+                    # No Linux (Cinnamon, GNOME, MATE, XFCE), o atalho padrão de zoom-in é Ctrl + Shift + +
+                    subprocess.run(["xdotool", "key", "ctrl+shift+plus"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(0.05)
+            except Exception:
+                pass
 
 def ajustar_zoom_console_out(passos=1):
-    """Diminui o nível de zoom do terminal enviando atalhos de teclado (Ctrl + -) no Windows."""
-    if os.name != 'nt':
-        return
-    try:
-        import ctypes
+    """Diminui o nível de zoom do terminal enviando atalhos de teclado (Ctrl + -)."""
+    if os.name == 'nt':
+        try:
+            import ctypes
+            import time
+            user32 = ctypes.windll.user32
+            
+            VK_CONTROL = 0x11
+            VK_OEM_MINUS = 0xBD
+            KEYEVENTF_KEYUP = 0x0002
+            
+            for _ in range(passos):
+                user32.keybd_event(VK_CONTROL, 0, 0, 0)
+                user32.keybd_event(VK_OEM_MINUS, 0, 0, 0)
+                user32.keybd_event(VK_OEM_MINUS, 0, KEYEVENTF_KEYUP, 0)
+                user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+                time.sleep(0.05)
+        except Exception:
+            pass
+    elif os.name == 'posix':
+        import subprocess
         import time
-        user32 = ctypes.windll.user32
-        
-        VK_CONTROL = 0x11
-        VK_OEM_MINUS = 0xBD
-        KEYEVENTF_KEYUP = 0x0002
-        
-        for _ in range(passos):
-            user32.keybd_event(VK_CONTROL, 0, 0, 0)
-            user32.keybd_event(VK_OEM_MINUS, 0, 0, 0)
-            user32.keybd_event(VK_OEM_MINUS, 0, KEYEVENTF_KEYUP, 0)
-            user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
-            time.sleep(0.05)
-    except Exception:
-        pass
+        if shutil.which('xdotool'):
+            try:
+                for _ in range(passos):
+                    # No Linux, o atalho padrão de zoom-out é Ctrl + -
+                    subprocess.run(["xdotool", "key", "ctrl+minus"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(0.05)
+            except Exception:
+                pass
 
 def auto_ajustar_zoom():
     """Detecta se o terminal está muito largo ou muito estreito e ajusta o zoom automaticamente."""
-    if os.name != 'nt':
+    # Executa apenas se for Windows OU se for Linux com xdotool disponível
+    if os.name != 'nt' and not (os.name == 'posix' and shutil.which('xdotool')):
         return
         
     global _tamanho_terminal_ultimo_ajuste, _ultimo_ajuste_zoom
@@ -387,3 +408,90 @@ def auto_ajustar_zoom():
     # Registra o estado atual estável do terminal
     _tamanho_terminal_ultimo_ajuste = (cols, rows)
     _ultimo_ajuste_zoom = time.time()
+
+def parse_data_hora_input(entrada, default_str):
+    """
+    Analisa um input de data/hora flexível com base em uma data/hora de referência.
+    Formatos aceitos:
+      - Apenas dia (ex: "4" -> 04/Mês/Ano Hora:Minuto:Segundo)
+      - Dia e mês (ex: "4/7" -> 04/07/Ano Hora:Minuto:Segundo)
+      - Dia, mês e ano (ex: "4/7/26" ou "4/7/2026")
+      - Apenas hora (ex: "15:30" ou "15:30:10")
+      - Data e hora (ex: "4 15:30", "4/7 15:30:10")
+    """
+    from datetime import datetime
+    
+    entrada = entrada.strip()
+    if not entrada:
+        return default_str
+        
+    try:
+        ref = datetime.strptime(default_str, "%d/%m/%Y %H:%M:%S")
+    except Exception:
+        ref = datetime.now()
+        
+    dia = ref.day
+    mes = ref.month
+    ano = ref.year
+    hora = ref.hour
+    minuto = ref.minute
+    segundo = ref.second
+    
+    partes = entrada.split()
+    
+    def parse_data_part(dp):
+        nonlocal dia, mes, ano
+        dt_partes = dp.split('/')
+        if len(dt_partes) == 1:
+            dia = int(dt_partes[0])
+        elif len(dt_partes) == 2:
+            dia = int(dt_partes[0])
+            mes = int(dt_partes[1])
+        elif len(dt_partes) == 3:
+            dia = int(dt_partes[0])
+            mes = int(dt_partes[1])
+            ano_str = dt_partes[2]
+            if len(ano_str) == 2:
+                ano = 2000 + int(ano_str)
+            else:
+                ano = int(ano_str)
+        else:
+            raise ValueError("Formato de data inválido")
+
+    def parse_time_part(tp):
+        nonlocal hora, minuto, segundo
+        tm_partes = tp.split(':')
+        if len(tm_partes) == 2:
+            hora = int(tm_partes[0])
+            minuto = int(tm_partes[1])
+            segundo = 0
+        elif len(tm_partes) == 3:
+            hora = int(tm_partes[0])
+            minuto = int(tm_partes[1])
+            segundo = int(tm_partes[2])
+        else:
+            raise ValueError("Formato de hora inválido")
+
+    try:
+        if len(partes) == 1:
+            p = partes[0]
+            if ':' in p:
+                parse_time_part(p)
+            else:
+                parse_data_part(p)
+        elif len(partes) == 2:
+            p1, p2 = partes[0], partes[1]
+            if ':' in p1:
+                parse_time_part(p1)
+                parse_data_part(p2)
+            else:
+                parse_data_part(p1)
+                parse_time_part(p2)
+        else:
+            raise ValueError("Muitos espaços no formato")
+            
+        # Valida a data construindo um objeto datetime
+        dt = datetime(ano, mes, dia, hora, minuto, segundo)
+        return dt.strftime("%d/%m/%Y %H:%M:%S")
+    except ValueError as e:
+        raise ValueError(f"valores inválidos ({e})")

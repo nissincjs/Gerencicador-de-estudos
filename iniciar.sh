@@ -96,6 +96,26 @@ if ! $PYTHON_BIN -c "import venv" &> /dev/null; then
     fi
 fi
 
+# 3.5. Verificar se o xdotool está instalado para suporte de zoom no Linux
+if [ "$IS_TERMUX" = false ]; then
+    if ! command -v xdotool &> /dev/null; then
+        echo -e "\033[93mAviso: O utilitário 'xdotool' não está instalado.\033[0m"
+        echo -e "Ele é necessário para ajustar o zoom do terminal automaticamente no Linux."
+        read -p "Deseja tentar instalar 'xdotool' via apt? (s/N): " opcao_zoom
+        if [[ "$opcao_zoom" =~ ^[Ss]$ ]]; then
+            echo -e "\nInstalando xdotool..."
+            sudo apt update && sudo apt install -y xdotool
+            if [ $? -ne 0 ]; then
+                echo -e "\033[91mAviso: Falha ao instalar o xdotool automaticamente. Você pode instalá-lo manualmente com 'sudo apt install xdotool'.\033[0m"
+            else
+                echo -e "\033[92m✔ xdotool instalado com sucesso!\033[0m"
+            fi
+        else
+            echo -e "Prosseguindo sem o recurso de zoom automático no Linux."
+        fi
+    fi
+fi
+
 # 4. Criar ou validar o ambiente virtual (venv)
 RECREAR_VENV=false
 if [ -d "venv" ]; then

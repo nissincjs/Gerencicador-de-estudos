@@ -6,7 +6,7 @@ from utils import (
     clear_screen, print_header, print_divider, mostrar_guia_dificuldade,
     obter_input_float, obter_input_str, parse_tempo_input, formatar_horas_minutos,
     obter_largura_ui, print_override as print, input_override as input,
-    set_largura_atual, reset_largura_atual
+    set_largura_atual, reset_largura_atual, parse_data_hora_input
 )
 from database import salvar_dados
 
@@ -567,13 +567,17 @@ def adicionar_sessao_estudo_manual(dados):
             
     # 3. Data e Hora
     default_data = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    print(f"\nFormatos de data/hora aceitos: {C_YELLOW}4{C_RESET} (dia 4), {C_YELLOW}4/7{C_RESET} (4 de julho), {C_YELLOW}15:30{C_RESET} (horas/minutos), {C_YELLOW}4 15:30{C_RESET}")
     while True:
-        entrada_data = obter_input_str(f"Data/Hora do estudo [{default_data}]: ", obrigatorio=False, default=default_data)
-        try:
-            datetime.strptime(entrada_data, "%d/%m/%Y %H:%M:%S")
+        entrada_raw = obter_input_str(f"Data/Hora do estudo [{default_data}]: ", obrigatorio=False)
+        if not entrada_raw:
+            entrada_data = default_data
             break
-        except ValueError:
-            print(f"{C_RED}Erro: Data inválida! Use o formato DD/MM/AAAA HH:MM:SS.{C_RESET}")
+        try:
+            entrada_data = parse_data_hora_input(entrada_raw, default_data)
+            break
+        except ValueError as e:
+            print(f"{C_RED}Erro: {e}. Tente novamente.{C_RESET}")
             
     # 4. Observação
     obs = obter_input_str("Observação (opcional): ", obrigatorio=False)
@@ -645,16 +649,18 @@ def editar_sessao_estudo(dados, sessoes_filtradas_com_index):
             print(f"{C_RED}Erro de formato: {e}. Tente novamente.{C_RESET}")
             
     # 3. Data e Hora
+    default_data = s.get("data")
+    print(f"\nFormatos de data/hora aceitos: {C_YELLOW}4{C_RESET} (dia 4), {C_YELLOW}4/7{C_RESET} (4 de julho), {C_YELLOW}15:30{C_RESET} (horas/minutos), {C_YELLOW}4 15:30{C_RESET}")
     while True:
-        nova_data = input(f"Data/Hora do estudo [{s.get('data')}]: ").strip()
-        if not nova_data:
-            nova_data = s.get("data")
+        nova_data_raw = input(f"Data/Hora do estudo [{default_data}]: ").strip()
+        if not nova_data_raw:
+            nova_data = default_data
             break
         try:
-            datetime.strptime(nova_data, "%d/%m/%Y %H:%M:%S")
+            nova_data = parse_data_hora_input(nova_data_raw, default_data)
             break
-        except ValueError:
-            print(f"{C_RED}Erro: Data inválida! Use o formato DD/MM/AAAA HH:MM:SS.{C_RESET}")
+        except ValueError as e:
+            print(f"{C_RED}Erro: {e}. Tente novamente.{C_RESET}")
             
     # 4. Observação
     nova_obs = obter_input_str(f"Observação [{s.get('obs', '')}]: ", obrigatorio=False, default=s.get("obs", ""))
@@ -1138,7 +1144,7 @@ def menu_ciclo_progresso(dados):
             streak = partner_menu.calcular_streak(dados)
             carga_formatada = formatar_horas_minutos(horas)
             estudado_formatado = formatar_horas_minutos(total_estudado)
-            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Sequência:{C_RESET} {C_GREEN}{streak} dias{C_RESET} 🔥")
+            print(f"  {C_BOLD}Carga:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Seq.:{C_RESET} {C_GREEN}{streak}d{C_RESET} 🔥")
             print_divider()
             
             print(f"  [{C_CYAN}1{C_RESET}] 📅 Ver Ciclo de Estudos Atual")

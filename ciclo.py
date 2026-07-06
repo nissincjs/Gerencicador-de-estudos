@@ -50,10 +50,10 @@ def main():
     if not supabase_client.esta_configurado():
         clear_screen()
         print_header("CONFIGURAÇÃO DO SUPABASE REQUERIDA")
-        print(f"\n  {C_YELLOW}Atenção:{C_RESET} O arquivo {C_BOLD}.env{C_RESET} não foi configurado ou contém chaves inválidas.")
-        print("  Para utilizar o sistema, siga as instruções abaixo:")
-        print(f"  1. Copie o arquivo {C_BOLD}.env.example{C_RESET} para {C_BOLD}.env{C_RESET}")
-        print(f"  2. Preencha as chaves {C_BOLD}SUPABASE_URL{C_RESET} e {C_BOLD}SUPABASE_KEY{C_RESET} com os dados do seu projeto.")
+        print(f"\n  {C_YELLOW}Atenção:{C_RESET} O arquivo {C_BOLD}.env{C_RESET} está ausente ou incompleto.")
+        print("  Siga os passos para configurar:")
+        print(f"  1. Copie {C_BOLD}.env.example{C_RESET} para {C_BOLD}.env{C_RESET}")
+        print(f"  2. Preencha as chaves do Supabase no arquivo {C_BOLD}.env{C_RESET}")
         print_divider()
         input("\nPressione Enter para sair e configurar...")
         return
@@ -243,7 +243,7 @@ def main():
             
             carga_formatada = formatar_horas_minutos(horas)
             estudado_formatado = formatar_horas_minutos(total_estudado)
-            print(f"  {C_BOLD}Carga Semanal:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET} | {C_BOLD}Sequência:{C_RESET} {C_GREEN}{streak} dias{C_RESET} 🔥")
+            print(f"  {C_BOLD}Carga:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET} | {C_BOLD}Seq.:{C_RESET} {C_GREEN}{streak}d{C_RESET} 🔥")
             print_divider()
             
             print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
