@@ -80,5 +80,39 @@ END $$;
 -- CREATE POLICY membros_insert ON membros_grupo FOR INSERT WITH CHECK (true);
 -- CREATE POLICY membros_delete ON membros_grupo FOR DELETE USING (true);
 
--- 5. (Opcional) Depois de validar a migração, pode limpar a coluna antiga:
--- ALTER TABLE perfis_usuario DROP COLUMN parceiro_id;
+-- 5. Remove a coluna antiga parceiro_id.
+--    A política de RLS "Permitir leitura ao proprietário ou parceiro" depende
+--    dessa coluna, então ela é recriada antes usando o modelo de grupos.
+--    A nova política permite a leitura ao proprietário e a todos os membros
+--    do mesmo grupo de estudos.
+
+-- 5.1 Remove a política antiga (que dependia da coluna parceiro_id)
+DROP POLICY IF EXISTS "Permitir leitura ao proprietário ou parceiro" ON ciclos_usuario;
+
+-- 5.2 Recria a política de leitura baseada no grupo de estudos
+DROP POLICY IF EXISTS "Permitir leitura ao proprietário e membros do grupo" ON ciclos_usuario;
+CREATE POLICY "Permitir leitura ao proprietário e membros do grupo"
+ON ciclos_usuario
+FOR SELECT
+USING (
+    ciclos_usuario.user_id = auth.uid()
+    OR EXISTS (
+        SELECT 1
+        FROM membros_grupo mg_meu
+        JOIN membros_grupo mg_alvo ON mg_alvo.grupo_id = mg_meu.grupo_id
+        WHERE mg_meu.user_id = auth.uid()
+          AND mg_alvo.user_id = ciclos_usuario.user_id
+    )
+);
+
+-- 5.3 Remove a coluna antiga
+ALTER TABLE perfis_usuario DROP COLUMN parceiro_id;
+
+-- 5.4 Verificação: deve retornar 0 linhas (nenhuma política referenciando parceiro_id)
+SELECT p.polname, p.polrelid::regclass
+FROM pg_policy p
+WHERE (pg_get_expr(p.polqual, p.polrelid) LIKE '%parceiro_id%'
+       OR pg_get_expr(p.polwithcheck, p.polrelid) LIKE '%parceiro_id%');
+
+-- Se a etapa 5.3 ainda falhar com outro objeto dependente, descubra qual com a
+-- consulta acima e remova/recrie a política correspondente antes de rodar de novo.
