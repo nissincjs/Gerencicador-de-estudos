@@ -7,7 +7,7 @@ from utils import (
     clear_screen, print_header, print_divider, formatar_horas_minutos,
     print_override as print, input_override as input
 )
-from database import carregar_dados, salvar_local, sincronizar_pendencias
+from database import carregar_dados, salvar_local, sincronizar_pendencias, salvar_dados
 from actions import (
     menu_ciclo_progresso, menu_materias, exibir_historico,
     configuracao_inicial, verificar_atualizacao, verificar_atualizacao_automatica
@@ -41,33 +41,14 @@ def e_vazio(dados: dict) -> bool:
     horas = dados.get("horas_semanais", 0.0)
     return len(materias) == 0 and horas == 0.0
 
-def main():
-    # Ajusta o zoom automaticamente se o terminal estiver muito grande no Windows
-    from utils import auto_ajustar_zoom
-    auto_ajustar_zoom()
-
-    # Verifica se o Supabase está devidamente configurado
-    if not supabase_client.esta_configurado():
+def tela_login(adicionar_perfil=False):
+    """Tela de login/cadastro tradicional. Retorna o usuário autenticado ou None (sair)."""
+    while True:
         clear_screen()
-        print_header("CONFIGURAÇÃO DO SUPABASE REQUERIDA")
-        print(f"\n  {C_YELLOW}Atenção:{C_RESET} O arquivo {C_BOLD}.env{C_RESET} está ausente ou incompleto.")
-        print("  Siga os passos para configurar:")
-        print(f"  1. Copie {C_BOLD}.env.example{C_RESET} para {C_BOLD}.env{C_RESET}")
-        print(f"  2. Preencha as chaves do Supabase no arquivo {C_BOLD}.env{C_RESET}")
-        print_divider()
-        input("\nPressione Enter para sair e configurar...")
-        return
-
-    usuario = supabase_client.recuperar_sessao_salva()
-    if usuario:
-        clear_screen()
-        print_header("SESSÃO RESTAURADA")
-        print(f"\n{C_GREEN}Bem-vindo(a) de volta, {usuario.email}!{C_RESET}")
-        input("\nPressione Enter para continuar para o painel...")
-
-    while not usuario:
-        clear_screen()
-        print_header("AUTENTICAÇÃO - CICLO DE ESTUDOS")
+        if adicionar_perfil:
+            print_header("ADICIONAR NOVO PERFIL")
+        else:
+            print_header("AUTENTICAÇÃO - CICLO DE ESTUDOS")
         print(f"  [{C_CYAN}1{C_RESET}] 🔑 Entrar (Login)")
         print(f"  [{C_CYAN}2{C_RESET}] 📝 Criar Nova Conta (Cadastro)")
         print(f"  [{C_CYAN}0{C_RESET}] ❌ Sair")
@@ -86,6 +67,7 @@ def main():
                 usuario = supabase_client.fazer_login(email, senha)
                 print(f"\n{C_GREEN}Login realizado com sucesso! Bem-vindo(a), {usuario.email}!{C_RESET}")
                 input("\nPressione Enter para continuar...")
+                return usuario
             except Exception as e:
                 print(f"\n{C_RED}Erro ao entrar: {e}{C_RESET}")
                 input("\nPressione Enter para tentar novamente...")
@@ -108,24 +90,109 @@ def main():
                 print(f"\n{C_GREEN}Conta criada com sucesso!{C_RESET}")
                 print(f"{C_YELLOW}Nota: Se você não desativou a confirmação por e-mail nas configurações do Supabase, você precisará confirmar seu e-mail antes de fazer login.{C_RESET}")
                 input("\nPressione Enter para continuar...")
+                return usuario
             except Exception as e:
                 print(f"\n{C_RED}Erro ao cadastrar: {e}{C_RESET}")
                 input("\nPressione Enter para tentar novamente...")
                 
         elif opcao == "0":
-            clear_screen()
-            print_header("ATÉ LOGO!")
-            print("Saindo do sistema de ciclo de estudos...\n")
-            return
+            return None
         else:
             print(f"\n{C_RED}Opção inválida!{C_RESET}")
             input("\nPressione Enter para tentar novamente...")
 
-    # Garante que o perfil do usuário esteja criado no banco
-    if usuario:
-        supabase_client.garantir_perfil_criado(usuario.id, usuario.email)
+def remover_perfil_flow(perfis):
+    """Fluxo para remover um perfil salvo do dispositivo."""
+    clear_screen()
+    print_header("REMOVER PERFIL")
+    print("  Qual perfil deseja remover deste dispositivo?\n")
+    for i, p in enumerate(perfis, start=1):
+        print(f"  [{C_CYAN}{i}{C_RESET}] 📧 {p['email']}")
+    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+    print_divider()
 
-    # Fluxo de Sincronização Local + Nuvem
+    escolha = input("Escolha uma opção: ").strip()
+    try:
+        idx = int(escolha)
+        if idx == 0:
+            return
+        if 1 <= idx <= len(perfis):
+            email = perfis[idx - 1]["email"]
+            confirmar = input(f"\n{C_RED}Deseja realmente remover o perfil {email}? (S/N): {C_RESET}").strip().upper()
+            if confirmar == "S":
+                supabase_client.excluir_perfil(email)
+                print(f"\n{C_GREEN}Perfil removido com sucesso.{C_RESET}")
+            else:
+                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+            input("\nPressione Enter para continuar...")
+        else:
+            print(f"\n{C_RED}Opção inválida!{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+    except (ValueError, IndexError):
+        print(f"\n{C_RED}Opção inválida!{C_RESET}")
+        input("\nPressione Enter para tentar novamente...")
+
+def selecionar_perfil():
+    """Mostra o seletor de perfis salvos. Retorna o usuário ativo ou None (sair)."""
+    while True:
+        try:
+            clear_screen()
+            print_header("SELECIONE UM PERFIL")
+            perfis = supabase_client.listar_perfis()
+
+            if not perfis:
+                return tela_login()
+
+            print("  Perfis salvos neste dispositivo:\n")
+            for i, p in enumerate(perfis, start=1):
+                print(f"  [{C_CYAN}{i}{C_RESET}] 📧 {p['email']}  {C_YELLOW}(salvo em {p['added_at']}){C_RESET}")
+            print_divider()
+            print(f"  [{C_CYAN}A{C_RESET}] ➕ Adicionar Novo Perfil (Login)")
+            print(f"  [{C_CYAN}R{C_RESET}] ❌ Remover um Perfil")
+            print(f"  [{C_CYAN}0{C_RESET}] 🚪 Sair")
+            print_divider()
+
+            opcao = input("Escolha uma opção: ").strip().upper()
+            try:
+                if opcao == "0":
+                    return None
+                elif opcao == "A":
+                    return tela_login(adicionar_perfil=True)
+                elif opcao == "R":
+                    remover_perfil_flow(perfis)
+                elif opcao.isdigit() and 1 <= int(opcao) <= len(perfis):
+                    email = perfis[int(opcao) - 1]["email"]
+                    print(f"\n{C_YELLOW}Ativando perfil {email}...{C_RESET}")
+                    usuario = supabase_client.ativar_perfil(email)
+                    if usuario:
+                        clear_screen()
+                        print_header("PERFIL ATIVADO")
+                        print(f"\n{C_GREEN}Bem-vindo(a) de volta, {usuario.email}!{C_RESET}")
+                        input("\nPressione Enter para continuar...")
+                        return usuario
+                    else:
+                        print(f"\n{C_RED}Não foi possível restaurar a sessão deste perfil (pode ter expirado).{C_RESET}")
+                        print(f"{C_YELLOW}Você precisará refazer o login desta conta.{C_RESET}")
+                        input("\nPressione Enter para continuar...")
+                        supabase_client.excluir_perfil(email)
+                        return tela_login(adicionar_perfil=True)
+                else:
+                    print(f"\n{C_RED}Opção inválida!{C_RESET}")
+                    input("\nPressione Enter para tentar novamente...")
+            except KeyboardInterrupt:
+                pass
+        except KeyboardInterrupt:
+            return None
+
+def autenticar_ou_selecionar_perfil():
+    """Escolhe entre o seletor de perfis (se houver salvos) ou a tela de login.
+    Retorna o usuário autenticado ou None para sair."""
+    if supabase_client.listar_perfis():
+        return selecionar_perfil()
+    return tela_login()
+
+def carregar_e_sincronizar_dados(usuario_email: str) -> dict:
+    """Fluxo de sincronização local + nuvem após autenticação."""
     dados_nuvem = supabase_client.baixar_dados_nuvem()
     local_exists = os.path.exists(DB_FILE)
     dados = None
@@ -137,17 +204,17 @@ def main():
             print(f"\n{C_GREEN}Dados salvos encontrados no Supabase! Recriando ciclo local...{C_RESET}")
             dados = dados_nuvem
             dados["sync_pending"] = False
-            salvar_local(dados)
+            salvar_local(dados, usuario_email)
             input("\nPressione Enter para continuar...")
         else:
-            dados_locais = carregar_dados()
+            dados_locais = carregar_dados(usuario_email)
             
             # 1. Se os dados locais estiverem vazios/zerados e a nuvem não,
             #    prioriza a nuvem automaticamente por segurança.
             if e_vazio(dados_locais) and not e_vazio(dados_nuvem):
                 dados = dados_nuvem
                 dados["sync_pending"] = False
-                salvar_local(dados)
+                salvar_local(dados, usuario_email)
                 clear_screen()
                 print_header("RESTAURAÇÃO AUTOMÁTICA")
                 print(f"\n{C_GREEN}Dados locais vazios detectados. Restaurando ciclo da nuvem...{C_RESET}")
@@ -157,13 +224,13 @@ def main():
             elif not e_vazio(dados_locais) and e_vazio(dados_nuvem):
                 dados = dados_locais
                 dados["sync_pending"] = True
-                salvar_local(dados)
+                salvar_local(dados, usuario_email)
                 
             # 3. Compara o conteúdo estrutural (ignorando campos de controle/timestamps)
             elif limpar_meta_dados(dados_locais) == limpar_meta_dados(dados_nuvem):
                 dados = dados_locais
                 dados["sync_pending"] = False
-                salvar_local(dados)
+                salvar_local(dados, usuario_email)
                 
             # 4. Compara timestamps de atualização
             else:
@@ -181,13 +248,13 @@ def main():
                             # Local é mais recente, mantém local e agenda sync
                             dados = dados_locais
                             dados["sync_pending"] = True
-                            salvar_local(dados)
+                            salvar_local(dados, usuario_email)
                             resolvido = True
                         elif dt_nuvem > dt_local:
                             # Nuvem é mais recente, baixa da nuvem
                             dados = dados_nuvem
                             dados["sync_pending"] = False
-                            salvar_local(dados)
+                            salvar_local(dados, usuario_email)
                             resolvido = True
                     except Exception:
                         pass
@@ -207,94 +274,149 @@ def main():
                         if escolha == "1":
                             dados = dados_locais
                             dados["sync_pending"] = True
-                            salvar_local(dados)
+                            salvar_local(dados, usuario_email)
                             print(f"\n{C_GREEN}Mantendo dados locais. Eles serão sincronizados na nuvem em breve.{C_RESET}")
                             input("\nPressione Enter para continuar...")
                         elif escolha == "2":
                             dados = dados_nuvem
                             dados["sync_pending"] = False
-                            salvar_local(dados)
+                            salvar_local(dados, usuario_email)
                             print(f"\n{C_GREEN}Dados da nuvem aplicados localmente com sucesso!{C_RESET}")
                             input("\nPressione Enter para continuar...")
                         else:
                             print(f"\n{C_RED}Opção inválida!{C_RESET}")
     else:
-        dados = carregar_dados()
+        dados = carregar_dados(usuario_email)
+
+    # Marca o dono dos dados para não misturar contas diferentes no mesmo dispositivo
+    if dados is not None:
+        dados["owner_email"] = usuario_email
 
     # Tenta sincronizar pendências imediatamente ao abrir
     sincronizar_pendencias(dados)
-    
-    # Executa a verificação e atualização automática na inicialização
-    verificar_atualizacao_automatica(dados)
-    
-    # Se for o primeiro acesso (sem horas configuradas e sem matérias)
-    if dados["horas_semanais"] == 0.0 and not dados["materias"]:
-        configuracao_inicial(dados)
-        
+    return dados
+
+def main():
+    # Ajusta o zoom automaticamente se o terminal estiver muito grande no Windows
+    from utils import auto_ajustar_zoom
+    auto_ajustar_zoom()
+
+    # Verifica se o Supabase está devidamente configurado
+    if not supabase_client.esta_configurado():
+        clear_screen()
+        print_header("CONFIGURAÇÃO DO SUPABASE REQUERIDA")
+        print(f"\n  {C_YELLOW}Atenção:{C_RESET} O arquivo {C_BOLD}.env{C_RESET} está ausente ou incompleto.")
+        print("  Siga os passos para configurar:")
+        print(f"  1. Copie {C_BOLD}.env.example{C_RESET} para {C_BOLD}.env{C_RESET}")
+        print(f"  2. Preencha as chaves do Supabase no arquivo {C_BOLD}.env{C_RESET}")
+        print_divider()
+        input("\nPressione Enter para sair e configurar...")
+        return
+
     while True:
-        try:
+        # Tenta restaurar a última sessão ativa
+        usuario = supabase_client.recuperar_sessao_salva()
+        if usuario:
             clear_screen()
-            print_header("MENU PRINCIPAL - CICLO DE ESTUDOS ESTRATÉGICO")
-            
-            horas = dados.get("horas_semanais", 0.0)
-            num_materias = len(dados.get("materias", []))
-            total_estudado = sum(dados.get("progresso_atual", {}).values())
-            streak = partner_menu.calcular_streak(dados)
-            
-            carga_formatada = formatar_horas_minutos(horas)
-            estudado_formatado = formatar_horas_minutos(total_estudado)
-            print(f"  {C_BOLD}Carga:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET} | {C_BOLD}Seq.:{C_RESET} {C_GREEN}{streak}d{C_RESET} 🔥")
-            print_divider()
-            
-            print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
-            print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
-            print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
-            print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
-            print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
-            print(f"  [{C_CYAN}6{C_RESET}] 👥 Grupo de Estudos")
-            print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar / Alternar Conta")
-            print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
-            print_divider()
-            
-            opcao = input("Escolha uma opção: ").strip()
-            
+            print_header("SESSÃO RESTAURADA")
+            print(f"\n{C_GREEN}Bem-vindo(a) de volta, {usuario.email}!{C_RESET}")
+            input("\nPressione Enter para continuar para o painel...")
+
+        # Se não restaurou, mostra o seletor de perfis (se houver) ou login
+        if not usuario:
+            usuario = autenticar_ou_selecionar_perfil()
+            if not usuario:
+                clear_screen()
+                print_header("ATÉ LOGO!")
+                print("Saindo do sistema de ciclo de estudos...\n")
+                return
+
+        # Garante que o perfil do usuário esteja criado no banco
+        supabase_client.garantir_perfil_criado(usuario.id, usuario.email)
+
+        # Fluxo de Sincronização Local + Nuvem
+        dados = carregar_e_sincronizar_dados(usuario.email)
+
+        # Executa a verificação e atualização automática na inicialização
+        verificar_atualizacao_automatica(dados)
+
+        # Se for o primeiro acesso (sem horas configuradas e sem matérias)
+        if dados["horas_semanais"] == 0.0 and not dados["materias"]:
+            configuracao_inicial(dados)
+
+        while True:
             try:
-                if opcao == "1":
-                    menu_ciclo_progresso(dados)
-                elif opcao == "2":
-                    menu_materias(dados)
-                elif opcao == "3":
-                    menu_revisoes(dados)
-                elif opcao == "4":
-                    exibir_historico(dados)
-                elif opcao == "5":
-                    verificar_atualizacao(dados)
-                elif opcao == "6":
-                    partner_menu.menu_grupo(dados)
-                elif opcao == "9":
-                    clear_screen()
-                    print_header("DESCONECTANDO")
-                    supabase_client.limpar_sessao()
-                    print(f"\n{C_GREEN}Você foi deslogado com sucesso!{C_RESET}")
-                    input("\nPressione Enter para sair...")
-                    break
-                elif opcao == "0":
-                    clear_screen()
-                    print_header("ATÉ LOGO!")
-                    print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
-                    print("Mantenha o foco e bons estudos! 📚🚀\n")
-                    break
-                else:
-                    print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-6 ou 9.{C_RESET}")
-                    input("\nPressione Enter para tentar novamente...")
+                clear_screen()
+                print_header("MENU PRINCIPAL - CICLO DE ESTUDOS ESTRATÉGICO")
+                
+                horas = dados.get("horas_semanais", 0.0)
+                num_materias = len(dados.get("materias", []))
+                total_estudado = sum(dados.get("progresso_atual", {}).values())
+                streak = partner_menu.calcular_streak(dados)
+                
+                carga_formatada = formatar_horas_minutos(horas)
+                estudado_formatado = formatar_horas_minutos(total_estudado)
+                print(f"  {C_BOLD}Carga:{C_RESET} {C_GREEN}{carga_formatada}{C_RESET} | {C_BOLD}Estudado:{C_RESET} {C_GREEN}{estudado_formatado}{C_RESET} | {C_BOLD}Matérias:{C_RESET} {C_GREEN}{num_materias}{C_RESET} | {C_BOLD}Seq.:{C_RESET} {C_GREEN}{streak}d{C_RESET} 🔥")
+                print_divider()
+                
+                print(f"  [{C_CYAN}1{C_RESET}] 📅 Ciclo de Estudos & Progresso")
+                print(f"  [{C_CYAN}2{C_RESET}] 📚 Gerenciar Matérias")
+                print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
+                print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
+                print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
+                print(f"  [{C_CYAN}6{C_RESET}] 👥 Grupo de Estudos")
+                print(f"  [{C_CYAN}7{C_RESET}] 👤 Trocar de Perfil")
+                print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar e Sair")
+                print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
+                print_divider()
+                
+                opcao = input("Escolha uma opção: ").strip()
+                
+                try:
+                    if opcao == "1":
+                        menu_ciclo_progresso(dados)
+                    elif opcao == "2":
+                        menu_materias(dados)
+                    elif opcao == "3":
+                        menu_revisoes(dados)
+                    elif opcao == "4":
+                        exibir_historico(dados)
+                    elif opcao == "5":
+                        verificar_atualizacao(dados)
+                    elif opcao == "6":
+                        partner_menu.menu_grupo(dados)
+                    elif opcao == "7":
+                        # Trocar de perfil
+                        print(f"\n{C_YELLOW}Salvando dados atuais...{C_RESET}")
+                        salvar_dados(dados)
+                        supabase_client.limpar_sessao_local()
+                        break
+                    elif opcao == "9":
+                        clear_screen()
+                        print_header("DESCONECTANDO")
+                        salvar_dados(dados)
+                        supabase_client.limpar_sessao()
+                        print(f"\n{C_GREEN}Você foi deslogado com sucesso!{C_RESET}")
+                        print(f"{C_YELLOW}Seus perfis salvos permanecem disponíveis no próximo acesso.{C_RESET}")
+                        input("\nPressione Enter para sair...")
+                        return
+                    elif opcao == "0":
+                        clear_screen()
+                        print_header("ATÉ LOGO!")
+                        print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
+                        print("Mantenha o foco e bons estudos! 📚🚀\n")
+                        return
+                    else:
+                        print(f"\n{C_RED}Opção inválida! Escolha um número entre 0, 1-7 ou 9.{C_RESET}")
+                        input("\nPressione Enter para tentar novamente...")
+                except KeyboardInterrupt:
+                    pass
             except KeyboardInterrupt:
-                pass
-        except KeyboardInterrupt:
-            clear_screen()
-            print_header("ATÉ LOGO!")
-            print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
-            print("Mantenha o foco e bons estudos! 📚🚀\n")
-            break
+                clear_screen()
+                print_header("ATÉ LOGO!")
+                print(f"\n{C_GREEN}Seu ciclo de estudos foi salvo com sucesso em '{DB_FILE}'!{C_RESET}")
+                print("Mantenha o foco e bons estudos! 📚🚀\n")
+                return
 
 if __name__ == "__main__":
     main()

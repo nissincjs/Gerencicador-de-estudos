@@ -16,6 +16,7 @@ __pycache__/
 # Configurações de ambiente / chaves de API
 .env
 .session.json
+.profiles.json
 
 # Ambientes virtuais
 venv/

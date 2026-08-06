@@ -17,15 +17,18 @@ if SUPABASE_URL and SUPABASE_KEY and not (SUPABASE_URL.startswith("https://sua-u
         pass
 
 import json
+from datetime import datetime
 
 SESSION_FILE = ".session.json"
+PROFILES_FILE = ".profiles.json"
 
 def esta_configurado() -> bool:
     """Verifica se o Supabase está configurado corretamente no .env."""
     return supabase is not None
 
-def salvar_sessao(session):
-    """Salva os tokens da sessão atual em um arquivo JSON local."""
+def salvar_sessao(session, email=None):
+    """Salva os tokens da sessão atual em um arquivo JSON local.
+    Se um email for informado, também registra/atualiza o perfil salvo."""
     if not session:
         return
     try:
@@ -37,19 +40,23 @@ def salvar_sessao(session):
             json.dump(dados_sessao, f)
     except Exception:
         pass
+    if email:
+        salvar_sessao_perfil(session, email)
 
-def limpar_sessao():
-    """Remove o arquivo de sessão local e desloga o usuário."""
+def limpar_sessao_local():
+    """Remove apenas a sessão ativa local, mantendo os perfis salvos.
+    Usado para trocar de perfil sem revogar os tokens (rápido e seguro
+    em dispositivos compartilhados)."""
     if os.path.exists(SESSION_FILE):
         try:
             os.remove(SESSION_FILE)
         except Exception:
             pass
-    if esta_configurado():
-        try:
-            supabase.auth.sign_out()
-        except Exception:
-            pass
+
+def limpar_sessao():
+    """Remove a sessão ativa local. Os perfis salvos permanecem disponíveis
+    para acesso futuro neste dispositivo."""
+    limpar_sessao_local()
 
 def recuperar_sessao_salva():
     """Tenta restaurar a sessão do usuário a partir dos tokens salvos localmente."""
@@ -63,10 +70,107 @@ def recuperar_sessao_salva():
             refresh_token = dados_sessao.get("refresh_token")
             if access_token and refresh_token:
                 response = supabase.auth.set_session(access_token=access_token, refresh_token=refresh_token)
-                return response.user
+                if response and response.session:
+                    salvar_sessao(response.session)
+                user = response.user
+                if user and user.email:
+                    dados_profiles = _carregar_profiles_file()
+                    if user.email in dados_profiles.get("profiles", {}) and response.session:
+                        dados_profiles["profiles"][user.email]["access_token"] = response.session.access_token
+                        dados_profiles["profiles"][user.email]["refresh_token"] = response.session.refresh_token
+                        dados_profiles["active"] = user.email
+                        _salvar_profiles_file(dados_profiles)
+                return user
         except Exception:
             limpar_sessao()
     return None
+
+def _carregar_profiles_file() -> dict:
+    """Carrega o arquivo de perfis salvos no dispositivo."""
+    try:
+        with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+        if isinstance(dados, dict):
+            dados.setdefault("profiles", {})
+            return dados
+    except Exception:
+        pass
+    return {"profiles": {}}
+
+def _salvar_profiles_file(dados: dict):
+    """Salva o arquivo de perfis no dispositivo."""
+    try:
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def listar_perfis() -> list:
+    """Retorna a lista de perfis salvos (email + data de adição)."""
+    dados = _carregar_profiles_file()
+    perfis = []
+    for email, info in dados.get("profiles", {}).items():
+        perfis.append({
+            "email": email,
+            "added_at": info.get("added_at", "N/A")
+        })
+    return perfis
+
+def salvar_sessao_perfil(session, email):
+    """Salva/atualiza os tokens da sessão no perfil correspondente ao email."""
+    if not session or not email:
+        return
+    try:
+        dados = _carregar_profiles_file()
+        perfil = dados["profiles"].setdefault(email, {})
+        perfil["access_token"] = session.access_token
+        perfil["refresh_token"] = session.refresh_token
+        if "added_at" not in perfil:
+            perfil["added_at"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        dados["active"] = email
+        _salvar_profiles_file(dados)
+    except Exception:
+        pass
+
+def ativar_perfil(email: str):
+    """Restaura a sessão de um perfil salvo pelo email. Retorna o usuário ou None."""
+    if not esta_configurado() or not email:
+        return None
+    dados = _carregar_profiles_file()
+    info = dados.get("profiles", {}).get(email)
+    if not info:
+        return None
+    access_token = info.get("access_token")
+    refresh_token = info.get("refresh_token")
+    if not access_token or not refresh_token:
+        return None
+    try:
+        response = supabase.auth.set_session(access_token=access_token, refresh_token=refresh_token)
+        user = response.user
+        if not user:
+            return None
+        if response.session:
+            salvar_sessao(response.session)
+            dados["profiles"][email]["access_token"] = response.session.access_token
+            dados["profiles"][email]["refresh_token"] = response.session.refresh_token
+            dados["active"] = email
+            _salvar_profiles_file(dados)
+        else:
+            salvar_sessao(info)
+        return user
+    except Exception:
+        return None
+
+def excluir_perfil(email: str):
+    """Remove um perfil salvo do dispositivo."""
+    if not email:
+        return
+    dados = _carregar_profiles_file()
+    if email in dados.get("profiles", {}):
+        del dados["profiles"][email]
+    if dados.get("active") == email:
+        dados["active"] = None
+    _salvar_profiles_file(dados)
 
 def fazer_login(email, password):
     """Realiza o login com email e senha no Supabase."""
@@ -75,7 +179,7 @@ def fazer_login(email, password):
     try:
         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
         if response.session:
-            salvar_sessao(response.session)
+            salvar_sessao(response.session, email)
         return response.user
     except Exception as e:
         # Extrai mensagem legível de erro, caso exista
@@ -93,7 +197,7 @@ def fazer_cadastro(email, password):
     try:
         response = supabase.auth.sign_up({"email": email, "password": password})
         if response.session:
-            salvar_sessao(response.session)
+            salvar_sessao(response.session, email)
         return response.user
     except Exception as e:
         raise Exception(str(e))

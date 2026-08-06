@@ -11,12 +11,32 @@ def obter_fator(m):
     dif = m.get("dificuldade", 1.0)
     return qp * pq * dif
 
-def carregar_dados():
-    """Carrega os dados salvos do ciclo de estudos e realiza migrações de dados se necessário."""
+def novo_ciclo() -> dict:
+    """Retorna um ciclo de estudos vazio (novo usuário / sem dados)."""
+    return {
+        "horas_semanais": 0.0,
+        "limite_revisoes_diarias": 10,
+        "data_inicio_ciclo": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "materias": [],
+        "progresso_atual": {},
+        "historico_ciclos": [],
+        "historico_sessoes": [],
+        "revisoes": [],
+        "justificativas": [],
+        "atualizacao_automatica": True
+    }
+
+def carregar_dados(usuario_email=None):
+    """Carrega os dados salvos do ciclo de estudos e realiza migrações de dados se necessário.
+    Se um usuario_email for informado e o arquivo local pertencer a outra conta,
+    devolve um ciclo vazio (os dados locais são de outro usuário)."""
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 dados = json.load(f)
+                owner = dados.get("owner_email")
+                if usuario_email and owner and owner != usuario_email:
+                    return novo_ciclo()
                 if "horas_semanais" not in dados:
                     dados["horas_semanais"] = 0.0
                 if "materias" not in dados:
@@ -86,23 +106,14 @@ def carregar_dados():
             print(f"{C_RED}Erro ao ler o arquivo {DB_FILE}: {e}{C_RESET}")
             input("Pressione Enter para iniciar com um ciclo vazio...")
             
-    return {
-        "horas_semanais": 0.0,
-        "limite_revisoes_diarias": 10,
-        "data_inicio_ciclo": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-        "materias": [],
-        "progresso_atual": {},
-        "historico_ciclos": [],
-        "historico_sessoes": [],
-        "revisoes": [],
-        "justificativas": [],
-        "atualizacao_automatica": True
-    }
+    return novo_ciclo()
 
-def salvar_local(dados):
+def salvar_local(dados, email=None):
     """Salva apenas localmente no arquivo JSON."""
     if "materias" in dados:
         dados["materias"].sort(key=obter_fator, reverse=True)
+    if email:
+        dados["owner_email"] = email
     # Define timestamp de atualização em UTC
     dados["updated_at"] = datetime.now(timezone.utc).isoformat()
     with open(DB_FILE, "w", encoding="utf-8") as f:

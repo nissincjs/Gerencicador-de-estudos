@@ -58,7 +58,14 @@ Cada sessão de estudo registrada gera um log contendo:
 ### 🚀 4. Auto-updater via GitHub
 Opção nativa no menu principal para verificar atualizações no repositório GitHub. Caso haja uma nova versão, o script realiza um `git pull` de forma automatizada e segura e reinicia a aplicação para aplicar as mudanças.
 
-### 👥 5. Grupo de Estudos (Responsabilidade Mútua)
+### 👥 5. Múltiplos Perfis no Mesmo Dispositivo
+Use vários logins no mesmo script sem precisar digitar e-mail e senha toda vez:
+* **Perfis salvos**: cada conta logada é salva no dispositivo e fica disponível no seletor de perfis.
+* **Seletor na inicialização**: quando há perfis salvos, uma tela permite escolher o perfil (ou adicionar um novo) antes de entrar.
+* **Troca rápida**: pelo menu principal (`[7] Trocar de Perfil`), troque de conta em segundos — os dados do perfil atual são sincronizados na nuvem automaticamente.
+* **Remover perfil**: remova contas do dispositivo quando quiser (os dados na nuvem continuam intactos).
+
+### 👥 6. Grupo de Estudos (Responsabilidade Mútua)
 Forme grupos de estudo com 2 ou mais pessoas (sem limite de membros) para manter a constância em equipe:
 * **Criação e convite**: o criador do grupo (admin) gera um código único (`GR-XXXXXX`) e os demais entram com esse código.
 * **Dashboard do grupo**: resumo de todos os membros com status de estudo do dia, sequência de consistência (streak) e metas semanais cumpridas.
@@ -156,6 +163,8 @@ No menu principal, você terá acesso rápido às seções organizadas:
 * Digite **`4`** para acessar seus **Históricos** (ver logs detalhados das suas sessões).
 * Digite **`5`** para buscar **Atualizações** do script.
 * Digite **`6`** para acessar o **Grupo de Estudos** (criar/entrar em grupo, acompanhar membros e gerenciar justificativas).
+* Digite **`7`** para **Trocar de Perfil** (alternar entre contas salvas neste dispositivo sem digitar senha de novo).
+* Digite **`9`** para **Deslogar e Sair** (mantém os perfis salvos para o próximo acesso).
 * Digite **`0`** para **Salvar e Sair** da aplicação.
 
 > **ℹ️ Grupo de Estudos**: para usar esse recurso, execute o script `migrar_grupos.sql` no SQL Editor do Supabase. Ele cria as tabelas `grupos` e `membros_grupo` e converte automaticamente vínculos de parceiro antigos em grupos.
