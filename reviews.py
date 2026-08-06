@@ -316,8 +316,8 @@ def desenhar_tabela_revisoes(lista_revisoes, titulo):
     utils.set_largura_atual(largura_tabela)
     try:
         print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
-        print(f"║{C_CYAN}{titulo.center(largura_tabela - 2)}{C_RESET}║")
-        print("╚" + "═" * (largura_tabela - 2) + "╝")
+        print(C_CYAN + f"║{titulo.center(largura_tabela - 2)}║")
+        print(C_CYAN + "╚" + "═" * (largura_tabela - 2) + "╝" + C_RESET)
         border_top = C_CYAN + "┌" + "─"*(w_id+2) + "┬" + "─"*(w_mat+2) + "┬" + "─"*(w_ass+2) + "┬" + "─"*(w_data+2) + "┬" + "─"*(w_pct+2) + "┬" + "─"*(w_prox+2) + "┬" + "─"*(w_stat+2) + "┐" + C_RESET
         border_mid = C_CYAN + "├" + "─"*(w_id+2) + "┼" + "─"*(w_mat+2) + "┼" + "─"*(w_ass+2) + "┼" + "─"*(w_data+2) + "┼" + "─"*(w_pct+2) + "┼" + "─"*(w_prox+2) + "┼" + "─"*(w_stat+2) + "┤" + C_RESET
         border_bot = C_CYAN + "└" + "─"*(w_id+2) + "┴" + "─"*(w_mat+2) + "┴" + "─"*(w_ass+2) + "┴" + "─"*(w_data+2) + "┴" + "─"*(w_pct+2) + "┴" + "─"*(w_prox+2) + "┴" + "─"*(w_stat+2) + "┘" + C_RESET

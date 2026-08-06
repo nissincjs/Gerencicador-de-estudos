@@ -6,11 +6,11 @@ from constants import (
 )
 
 def obter_largura_ui(largura_max=115):
-    """Retorna a largura ideal da UI dinâmica com base no terminal atual (min 70)."""
+    """Retorna a largura ideal da UI dinâmica com base no terminal atual."""
     try:
         cols = shutil.get_terminal_size((80, 20)).columns
         limite_superior = largura_max if largura_max is not None else cols - 4
-        return max(70, min(limite_superior, cols - 4))
+        return max(20, min(limite_superior, cols - 4))
     except Exception:
         return 70
 
@@ -25,8 +25,10 @@ def atualizar_largura_dinamica():
     if not _largura_manual:
         try:
             cols = shutil.get_terminal_size((80, 20)).columns
-            # Limit the default width of menus/headers to 115 to occupy a larger area
-            _largura_atual = max(70, min(115, cols - 4))
+            # Limita a largura padrão dos menus/cabeçalhos a 115, mas também
+            # se adapta a terminais estreitos (ex.: Termux no celular em retrato),
+            # em vez de forçar 70 colunas e estourar a tela.
+            _largura_atual = max(20, min(115, cols - 4))
             
             # Recalculate margins
             if cols > _largura_atual:
@@ -141,9 +143,13 @@ def print_header(title, width=None):
         width = max(70, width)
         margin = obter_margem_esquerda(width)
     import builtins
+    # Em terminais estreitos, encurta o título para não passar das bordas
+    largura_interna = max(2, width - 2)
+    if len(title) > largura_interna:
+        title = title[:max(1, largura_interna - 1)] + "…"
     builtins.print(margin + C_CYAN + "╔" + "═" * (width - 2) + "╗")
-    builtins.print(margin + f"║{title.center(width - 2)}║")
-    builtins.print(margin + "╚" + "═" * (width - 2) + "╝" + C_RESET)
+    builtins.print(margin + C_CYAN + f"║{title.center(width - 2)}║")
+    builtins.print(margin + C_CYAN + "╚" + "═" * (width - 2) + "╝" + C_RESET)
 
 def print_divider(width=None):
     """Exibe uma linha divisória sólida em ciano (largura dinâmica ou fixa, centralizada)."""

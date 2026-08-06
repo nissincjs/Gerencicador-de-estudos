@@ -42,8 +42,8 @@ def exibir_ciclo(dados, pausar=True):
     try:
         # Exibe o cabeçalho ajustado para a largura dinâmica da tabela
         print(C_CYAN + "╔" + "═" * (largura_tabela - 2) + "╗")
-        print(f"║{C_CYAN}{'SEU CICLO DE ESTUDOS ESTRATÉGICO'.center(largura_tabela - 2)}{C_RESET}║")
-        print("╚" + "═" * (largura_tabela - 2) + "╝")
+        print(C_CYAN + f"║{'SEU CICLO DE ESTUDOS ESTRATÉGICO'.center(largura_tabela - 2)}║")
+        print(C_CYAN + "╚" + "═" * (largura_tabela - 2) + "╝" + C_RESET)
         
         horas_totais = dados.get("horas_semanais", 0.0)
         data_inicio = dados.get("data_inicio_ciclo", "N/A")
@@ -362,9 +362,29 @@ def verificar_conclusao_ciclo(dados):
         
         clear_screen()
         width = obter_largura_ui()
+        largura_interna = max(2, width - 2)
+        msg = "🎉 PARABÉNS! VOCÊ CONCLUIU SEU CICLO DE ESTUDOS! 🎉"
+        # Quebra a mensagem em linhas para caber em terminais estreitos
+        if len(msg) > largura_interna:
+            palavras = msg.split()
+            linhas = []
+            atual = ""
+            for p in palavras:
+                if atual and len(atual) + 1 + len(p) <= largura_interna:
+                    atual += " " + p
+                else:
+                    if atual:
+                        linhas.append(atual)
+                    atual = p
+            if atual:
+                linhas.append(atual)
+            linhas = [l[:largura_interna] for l in linhas]
+        else:
+            linhas = [msg]
         print(C_GREEN + "╔" + "═" * (width - 2) + "╗")
-        print("║" + "🎉 PARABÉNS! VOCÊ CONCLUIU SEU CICLO DE ESTUDOS! 🎉".center(width - 2) + "║")
-        print("╚" + "═" * (width - 2) + "╝" + C_RESET)
+        for linha in linhas:
+            print(C_GREEN + f"║{linha.center(width - 2)}║")
+        print(C_GREEN + "╚" + "═" * (width - 2) + "╝" + C_RESET)
         print(f"\n  • Início do Ciclo: {novo_ciclo_historico['data_inicio']}")
         print(f"  • Fim do Ciclo:    {novo_ciclo_historico['data_fim']}")
         print(f"  • Carga Horária:   {horas_totais}h total de foco")
