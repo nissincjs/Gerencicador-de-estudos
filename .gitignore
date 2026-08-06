@@ -1,5 +1,7 @@
 # Banco de dados / Dados locais do usuário
 ciclo_estudos.json
+ciclo_estudos.json.backup*
+ciclo_estudos.json.tmp
 
 # Cache do Python
 __pycache__/

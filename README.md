@@ -136,7 +136,11 @@ O espaçamento de revisões utiliza o algoritmo **SuperMemo-2 (SM2)** adaptado p
    ```bash
    cd Gerencicador-de-estudos
    ```
-3. Execute o script inicializador adequado para o seu sistema (ele criará o ambiente virtual `venv` e instalará todas as dependências automaticamente):
+3. **Configure o Supabase** (usado para autenticação, sincronização na nuvem e grupos de estudo):
+   1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
+   2. No **SQL Editor** do projeto, execute o script `setup_banco.sql` (cria todas as tabelas e políticas).
+   3. Copie o arquivo `.env.example` para `.env` e preencha a **URL** e a **chave anon** do projeto (em *Project Settings → API*).
+4. Execute o script inicializador adequado para o seu sistema (ele criará o ambiente virtual `venv` e instalará todas as dependências automaticamente):
 
    * **No Windows:**
      * Dê um duplo-clique no arquivo `iniciar.bat` ou execute no terminal:
