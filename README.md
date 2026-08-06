@@ -113,7 +113,7 @@ O espaçamento de revisões utiliza o algoritmo **SuperMemo-2 (SM2)** adaptado p
 ├── database.py          # Leitura/Escrita do JSON e migração automática de dados
 ├── utils.py             # Helpers para formatação de data, tempo e inputs
 ├── constants.py         # Cores ANSI e variáveis de configuração de tela
-├── migrar_grupos.sql    # Script SQL para criar as tabelas de grupos no Supabase
+├── setup_banco.sql      # Script SQL completo (tabelas + políticas + migração) para o Supabase
 ├── version.txt          # Arquivo contendo a versão atual instalada
 └── ciclo_estudos.json   # Banco de dados local (gerado automaticamente)
 ```
@@ -167,7 +167,7 @@ No menu principal, você terá acesso rápido às seções organizadas:
 * Digite **`9`** para **Deslogar e Sair** (mantém os perfis salvos para o próximo acesso).
 * Digite **`0`** para **Salvar e Sair** da aplicação.
 
-> **ℹ️ Grupo de Estudos**: para usar esse recurso, execute o script `migrar_grupos.sql` no SQL Editor do Supabase. Ele cria as tabelas `grupos` e `membros_grupo` e converte automaticamente vínculos de parceiro antigos em grupos.
+> **ℹ️ Configuração do banco**: execute o script `setup_banco.sql` no SQL Editor do Supabase. Ele cria **todas** as tabelas (`perfis_usuario`, `ciclos_usuario`, `grupos` e `membros_grupo`) e as políticas de acesso. Funciona em banco novo e, em banco antigo, converte automaticamente vínculos de parceiro em grupos e remove o legado. É idempotente (pode rodar quantas vezes quiser).
 
 ---
 <div align="center">
