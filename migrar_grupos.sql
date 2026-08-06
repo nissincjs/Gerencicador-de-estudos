@@ -32,8 +32,15 @@ BEGIN
     FOR p IN
         SELECT * FROM perfis_usuario
         WHERE parceiro_id IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM membros_grupo WHERE user_id = perfis_usuario.user_id)
     LOOP
+        -- Re-checa se o usuário já está em algum grupo. A verificação é feita
+        -- AQUI (dentro do loop) e não no SELECT, porque o cursor do FOR usa um
+        -- snapshot "antigo" que não enxerga os membros inseridos durante o loop,
+        -- o que causaria erro de chave duplicada em vínculos mútuos.
+        IF EXISTS (SELECT 1 FROM membros_grupo WHERE user_id = p.user_id) THEN
+            CONTINUE;
+        END IF;
+
         -- Gera um código único no formato GR-XXXXXX
         LOOP
             novo_codigo := 'GR-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
@@ -45,12 +52,16 @@ BEGIN
         RETURNING id INTO novo_grupo_id;
 
         -- Usuário atual vira membro (e criador/admin) do grupo
-        INSERT INTO membros_grupo (grupo_id, user_id) VALUES (novo_grupo_id, p.user_id);
+        INSERT INTO membros_grupo (grupo_id, user_id)
+        VALUES (novo_grupo_id, p.user_id)
+        ON CONFLICT (user_id) DO NOTHING;
 
         -- Se o parceiro apontar de volta (vínculo mútuo), entra no mesmo grupo.
         -- Caso contrário, o vínculo fica pendente: o parceiro entra pelo código.
         IF EXISTS (SELECT 1 FROM perfis_usuario WHERE user_id = p.parceiro_id AND parceiro_id = p.user_id) THEN
-            INSERT INTO membros_grupo (grupo_id, user_id) VALUES (novo_grupo_id, p.parceiro_id);
+            INSERT INTO membros_grupo (grupo_id, user_id)
+            VALUES (novo_grupo_id, p.parceiro_id)
+            ON CONFLICT (user_id) DO NOTHING;
         END IF;
     END LOOP;
 END $$;
