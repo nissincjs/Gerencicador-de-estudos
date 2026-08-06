@@ -231,11 +231,11 @@ def exibir_calendario_consistencia(dados):
         
     print(f"\n  {C_BOLD}Legenda:{C_RESET} 🟩 Estudou | 🟥 Não Estudou | 🟨 Justificado | ⬜ Futuro")
 
-def visualizar_logs_dia_parceiro(dados_parceiro):
-    """Permite ao usuário visualizar os logs de estudo do parceiro para um dia específico."""
+def visualizar_logs_dia_membro(dados_membro):
+    """Permite ao usuário visualizar os logs de estudo de um membro para um dia específico."""
     while True:
         clear_screen()
-        print_header("LOGS DE ESTUDO DO PARCEIRO POR DATA")
+        print_header("LOGS DE ESTUDO DO MEMBRO POR DATA")
         
         ontem_str = (date.today() - timedelta(days=1)).strftime("%d/%m/%Y")
         print(f"Digite a data no formato {C_YELLOW}DD/MM/AAAA{C_RESET} (ou {C_CYAN}0{C_RESET} para voltar).")
@@ -254,7 +254,7 @@ def visualizar_logs_dia_parceiro(dados_parceiro):
             input("\nPressione Enter para tentar novamente...")
             continue
             
-        sessoes = dados_parceiro.get("historico_sessoes", [])
+        sessoes = dados_membro.get("historico_sessoes", [])
         sessoes_do_dia = []
         for s in sessoes:
             data_s = s.get("data", "")
@@ -265,7 +265,7 @@ def visualizar_logs_dia_parceiro(dados_parceiro):
                 sessoes_do_dia.append(s)
                 
         clear_screen()
-        print_header(f"LOGS DO PARCEIRO EM {data_input}")
+        print_header(f"LOGS DO MEMBRO EM {data_input}")
         
         if not sessoes_do_dia:
             print(f"\n{C_YELLOW}⚠ Nenhum registro de estudo ou ajuste encontrado para o dia {data_input}.{C_RESET}")
@@ -309,34 +309,36 @@ def visualizar_logs_dia_parceiro(dados_parceiro):
                 print_divider()
                 
             # Calcula o tempo total real estudado no dia considerando os deltas (e ajustes)
-            estudos_do_dia_dict = calcular_estudos_por_dia(dados_parceiro).get(data_input, {})
+            estudos_do_dia_dict = calcular_estudos_por_dia(dados_membro).get(data_input, {})
             total_horas = max(0.0, sum(estudos_do_dia_dict.values()))
             print(f"\n  {C_BOLD}Total de Estudo Focado no Dia:{C_RESET} {C_GREEN}{formatar_horas_minutos(total_horas)}{C_RESET}")
             
         input("\nPressione Enter para voltar à consulta por data...")
 
-def exibir_status_parceiro(perfil_parceiro):
-    """Exibe o painel de métricas de estudo do parceiro."""
+def exibir_status_membro(perfil_membro, dados_locais=None):
+    """Exibe o painel de métricas de estudo de um membro do grupo."""
     clear_screen()
-    print_header(f"ACOMPANHAMENTO: {perfil_parceiro['email'].upper()}")
+    print_header(f"ACOMPANHAMENTO: {perfil_membro['email'].upper()}")
     
-    # Baixa os dados do parceiro no Supabase
-    print(f"{C_YELLOW}Buscando dados em tempo real do parceiro...{C_RESET}")
-    dados_parceiro = supabase_client.baixar_dados_parceiro(perfil_parceiro["user_id"])
+    # Usa os dados locais (caso seja o próprio usuário) ou baixa do Supabase
+    dados_membro = dados_locais
+    if dados_membro is None:
+        print(f"{C_YELLOW}Buscando dados em tempo real do membro...{C_RESET}")
+        dados_membro = supabase_client.baixar_dados_membro(perfil_membro["user_id"])
     
-    if not dados_parceiro:
-        print(f"\n{C_RED}⚠ O parceiro ainda não sincronizou dados na nuvem.{C_RESET}")
+    if not dados_membro:
+        print(f"\n{C_RED}⚠ Este membro ainda não sincronizou dados na nuvem.{C_RESET}")
         input("\nPressione Enter para voltar...")
         return
         
     while True:
         clear_screen()
-        print_header(f"ACOMPANHAMENTO: {perfil_parceiro['email'].upper()}")
+        print_header(f"ACOMPANHAMENTO: {perfil_membro['email'].upper()}")
         
-        estudos_hoje = obter_estudos_hoje(dados_parceiro)
-        streak = calcular_streak(dados_parceiro)
-        metas = obter_metas_semana(dados_parceiro)
-        justificativas = dados_parceiro.get("justificativas", [])
+        estudos_hoje = obter_estudos_hoje(dados_membro)
+        streak = calcular_streak(dados_membro)
+        metas = obter_metas_semana(dados_membro)
+        justificativas = dados_membro.get("justificativas", [])
         
         print_divider()
         print(f"  {C_BOLD}Status Hoje:{C_RESET}", end=" ")
@@ -352,7 +354,7 @@ def exibir_status_parceiro(perfil_parceiro):
         
         print_divider()
         # Exibe o calendário de consistência
-        exibir_calendario_consistencia(dados_parceiro)
+        exibir_calendario_consistencia(dados_membro)
         
         print_divider()
         print(f"  {C_BOLD}Justificativas de Ausência:{C_RESET}")
@@ -370,7 +372,7 @@ def exibir_status_parceiro(perfil_parceiro):
         
         opcao = input("Escolha uma opção: ").strip()
         if opcao == "1":
-            visualizar_logs_dia_parceiro(dados_parceiro)
+            visualizar_logs_dia_membro(dados_membro)
         elif opcao == "0" or not opcao:
             break
 
@@ -379,7 +381,7 @@ def registrar_justificativa_propria(dados):
     clear_screen()
     print_header("REGISTRAR JUSTIFICATIVA")
     
-    print("Justifique sua ausência para manter seu parceiro de estudos informado.")
+    print("Justifique sua ausência para manter seu grupo de estudos informado.")
     print("Exemplos: 'Fiquei doente', 'Viagem de trabalho', 'Emergência familiar'.\n")
     
     # Data da justificativa
@@ -536,107 +538,235 @@ def menu_justificativas(dados):
         except KeyboardInterrupt:
             break
 
-def menu_parceria(dados):
-    """Menu principal do sistema de parceiros."""
+def exibir_resumo_grupo(dados):
+    """Exibe o dashboard de resumo de todos os membros do grupo."""
+    membros = supabase_client.listar_membros_grupo()
+    if not membros:
+        return False
+
+    current_user_id = supabase_client.obter_id_usuario()
+
+    print_divider()
+    print(f"  {C_BOLD}👥 Membros do Grupo ({len(membros)}):{C_RESET}")
+    print_divider()
+
+    for i, membro in enumerate(membros, start=1):
+        eh_voce = membro["user_id"] == current_user_id
+        nome_exib = "VOCÊ" if eh_voce else membro["email"].split("@")[0]
+
+        if eh_voce:
+            dados_membro = dados
+            status = "✅" if obter_estudos_hoje(dados_membro)["estudou"] else "❌"
+            streak = calcular_streak(dados_membro)
+            metas = obter_metas_semana(dados_membro)
+            print(f"  [{i}] {C_CYAN}{nome_exib}{C_RESET} - Hoje: {status} | Seq.: {C_GREEN}{streak}d{C_RESET} 🔥 | Metas: {C_GREEN}{metas['cumpridas']}/{metas['total']}{C_RESET} {C_YELLOW}(você){C_RESET}")
+        else:
+            dados_membro = supabase_client.baixar_dados_membro(membro["user_id"])
+            if dados_membro:
+                status = "✅" if obter_estudos_hoje(dados_membro)["estudou"] else "❌"
+                streak = calcular_streak(dados_membro)
+                metas = obter_metas_semana(dados_membro)
+                print(f"  [{i}] {C_CYAN}{nome_exib}{C_RESET} - Hoje: {status} | Seq.: {C_GREEN}{streak}d{C_RESET} 🔥 | Metas: {C_GREEN}{metas['cumpridas']}/{metas['total']}{C_RESET}")
+            else:
+                print(f"  [{i}] {C_CYAN}{nome_exib}{C_RESET} - {C_YELLOW}⚠ Sem dados sincronizados ainda{C_RESET}")
+
+    print_divider()
+    return True
+
+def selecionar_membro_para_acompanhar(dados):
+    """Mostra a lista de membros e permite escolher um para acompanhar em detalhes."""
+    membros = supabase_client.listar_membros_grupo()
+    if not membros:
+        return
+
+    clear_screen()
+    print_header("ACOMPANHAR MEMBRO DO GRUPO")
+
+    current_user_id = supabase_client.obter_id_usuario()
+    print("  Escolha qual membro deseja acompanhar:\n")
+    for i, membro in enumerate(membros, start=1):
+        eh_voce = membro["user_id"] == current_user_id
+        nome_exib = "VOCÊ" if eh_voce else membro["email"].split("@")[0]
+        print(f"  [{C_CYAN}{i}{C_RESET}] {nome_exib}{C_YELLOW} (você){C_RESET}" if eh_voce else f"  [{C_CYAN}{i}{C_RESET}] {nome_exib}")
+    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+    print_divider()
+
+    escolha = obter_input_float("Escolha o número do membro (ou 0 para voltar): ", min_val=0, max_val=len(membros))
+    if escolha == 0:
+        return
+
+    idx = int(escolha) - 1
+    membro = membros[idx]
+
+    if membro["user_id"] == current_user_id:
+        exibir_status_membro(membro, dados_locais=dados)
+    else:
+        exibir_status_membro(membro)
+
+def criar_grupo_flow():
+    """Fluxo de criação de um novo grupo de estudos."""
+    clear_screen()
+    print_header("CRIAR GRUPO DE ESTUDOS")
+
+    confirmar = obter_input_str("Deseja criar um novo grupo de estudos? (S/N): ").upper()
+    if confirmar != 'S':
+        print(f"\n{C_YELLOW}Criação cancelada.{C_RESET}")
+        input("\nPressione Enter para continuar...")
+        return
+
+    print(f"\n{C_YELLOW}Criando grupo...{C_RESET}")
+    try:
+        codigo = supabase_client.criar_grupo()
+        print(f"\n{C_GREEN}✔ Grupo criado com sucesso! Você é o administrador.{C_RESET}")
+        print(f"  Código de convite: {C_BOLD}{C_GREEN}{codigo}{C_RESET}")
+        print("  Compartilhe este código para outros entrarem no grupo.\n")
+    except Exception as e:
+        print(f"\n{C_RED}Erro ao criar grupo: {e}{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def entrar_grupo_flow():
+    """Fluxo para entrar em um grupo existente pelo código de convite."""
+    clear_screen()
+    print_header("ENTRAR EM UM GRUPO DE ESTUDOS")
+
+    codigo = input("\nDigite o código de convite do grupo (ex: GR-XXXXXX): ").strip()
+    if not codigo:
+        return
+
+    print(f"\n{C_YELLOW}Entrando no grupo...{C_RESET}")
+    try:
+        supabase_client.entrar_grupo(codigo)
+        print(f"\n{C_GREEN}✔ Você entrou no grupo com sucesso! Bons estudos em equipe!{C_RESET}")
+    except Exception as e:
+        print(f"\n{C_RED}Erro ao entrar no grupo: {e}{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def sair_grupo_flow():
+    """Fluxo para o usuário sair do grupo atual."""
+    confirmar = input(f"\n{C_RED}Deseja realmente sair do grupo de estudos? (S/N): {C_RESET}").strip().upper()
+    if confirmar == "S":
+        supabase_client.sair_grupo()
+        print(f"\n{C_GREEN}Você saiu do grupo com sucesso.{C_RESET}")
+    else:
+        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def remover_membro_flow():
+    """Fluxo para o admin remover um membro do grupo."""
+    clear_screen()
+    print_header("REMOVER MEMBRO DO GRUPO")
+
+    membros = supabase_client.listar_membros_grupo()
+    current_user_id = supabase_client.obter_id_usuario()
+    outros = [m for m in membros if m["user_id"] != current_user_id]
+
+    if not outros:
+        print(f"\n{C_YELLOW}Não há outros membros para remover.{C_RESET}")
+        input("\nPressione Enter para continuar...")
+        return
+
+    print("  Selecione o membro a ser removido:\n")
+    for i, m in enumerate(outros, start=1):
+        print(f"  [{C_CYAN}{i}{C_RESET}] {m['email']}")
+    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+    print_divider()
+
+    escolha = obter_input_float("Escolha o número do membro (ou 0 para voltar): ", min_val=0, max_val=len(outros))
+    if escolha == 0:
+        return
+
+    idx = int(escolha) - 1
+    alvo = outros[idx]
+
+    confirmar = input(f"\n{C_RED}Deseja realmente remover {alvo['email']} do grupo? (S/N): {C_RESET}").strip().upper()
+    if confirmar == "S":
+        try:
+            supabase_client.remover_membro(alvo["user_id"])
+            print(f"\n{C_GREEN}✔ Membro {alvo['email']} removido com sucesso.{C_RESET}")
+        except Exception as e:
+            print(f"\n{C_RED}Erro ao remover membro: {e}{C_RESET}")
+    else:
+        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def dissolver_grupo_flow():
+    """Fluxo para o admin dissolver o grupo inteiro."""
+    confirmar = input(f"\n{C_RED}Deseja realmente dissolver o grupo inteiro? Todos os membros serão removidos. (S/N): {C_RESET}").strip().upper()
+    if confirmar == "S":
+        supabase_client.dissolver_grupo()
+        print(f"\n{C_GREEN}Grupo dissolvido com sucesso.{C_RESET}")
+    else:
+        print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
+    input("\nPressione Enter para continuar...")
+
+def menu_grupo(dados):
+    """Menu principal do sistema de grupos de estudos."""
     while True:
         try:
             clear_screen()
-            print_header("PARCEIRO DE ESTUDOS (RESPONSABILIDADE MÚTUA)")
-            
-            # Busca o perfil do usuário logado
-            perfil = supabase_client.obter_perfil()
-            if not perfil:
-                print(f"\n{C_RED}Não foi possível carregar seu perfil. Verifique sua conexão.{C_RESET}")
-                input("\nPressione Enter para voltar...")
-                return
-                
-            parceiro_id = perfil.get("parceiro_id")
-            
-            if not parceiro_id:
-                # Sem parceiro vinculado
-                print(f"  Seu código de convite: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}")
-                print("  Compartilhe este código com seu parceiro de estudos para se vincularem!\n")
-                print(f"  [{C_CYAN}1{C_RESET}] 🤝 Vincular Parceiro (Inserir código)")
+            print_header("GRUPO DE ESTUDOS (RESPONSABILIDADE MÚTUA)")
+
+            info = supabase_client.obter_grupo_do_usuario()
+
+            if not info:
+                # Sem grupo vinculado
+                print("  Você ainda não está em nenhum grupo de estudos.")
+                print("  Crie um grupo e compartilhe o código, ou entre em um grupo existente!\n")
+                print(f"  [{C_CYAN}1{C_RESET}] ➕ Criar Novo Grupo")
+                print(f"  [{C_CYAN}2{C_RESET}] 🎟️  Entrar em um Grupo (Inserir código)")
                 print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
                 print_divider()
-                
+
                 opcao = input("Escolha uma opção: ").strip()
                 try:
                     if opcao == "1":
-                        codigo = input("\nDigite o código de convite do seu parceiro (ex: ST-XXXXXX): ").strip()
-                        if not codigo:
-                            continue
-                        print(f"\n{C_YELLOW}Tentando estabelecer vínculo...{C_RESET}")
-                        try:
-                            supabase_client.vincular_parceiro(codigo)
-                            print(f"\n{C_GREEN}✔ Vínculo realizado com sucesso! Bons estudos em equipe!{C_RESET}")
-                        except Exception as e:
-                            print(f"\n{C_RED}Erro ao vincular: {e}{C_RESET}")
-                        input("\nPressione Enter para continuar...")
+                        criar_grupo_flow()
+                    elif opcao == "2":
+                        entrar_grupo_flow()
                     elif opcao == "0":
                         break
                 except KeyboardInterrupt:
                     pass
             else:
-                # Com parceiro vinculado (pode estar pendente de confirmação mútua)
-                perfil_parceiro = supabase_client.obter_perfil_por_id(parceiro_id)
-                eh_mutuo = perfil_parceiro and perfil_parceiro.get("parceiro_id") == perfil.get("user_id")
-                
-                if eh_mutuo:
-                    parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
-                    
-                    print(f"  Parceiro vinculado: {C_GREEN}{parceiro_email}{C_RESET}\n")
-                    print(f"  [{C_CYAN}1{C_RESET}] 📊 Acompanhar Consistência do Parceiro")
+                # Com grupo vinculado
+                grupo = info["grupo"]
+                current_user_id = supabase_client.obter_id_usuario()
+                eh_admin = grupo["criador_id"] == current_user_id
+
+                print(f"  Código do grupo: {C_BOLD}{C_GREEN}{grupo['codigo_convite']}{C_RESET}")
+                print("  Compartilhe este código para outros entrarem no grupo!\n")
+
+                exibir_resumo_grupo(dados)
+
+                if eh_admin:
+                    print(f"  Você é o {C_MAGENTA}administrador{C_RESET} do grupo. 👑")
+                    print(f"  [{C_CYAN}1{C_RESET}] 📊 Acompanhar Consistência de um Membro")
                     print(f"  [{C_CYAN}2{C_RESET}] 📝 Gerenciar Justificativas de Ausência (CRUD)")
-                    print(f"  [{C_CYAN}9{C_RESET}] ❌ Desvincular Parceiro de Estudos")
-                    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
-                    print_divider()
-                    
-                    opcao = input("Escolha uma opção: ").strip()
-                    try:
-                        if opcao == "1":
-                            if perfil_parceiro:
-                                exibir_status_parceiro(perfil_parceiro)
-                            else:
-                                print(f"\n{C_RED}Erro ao obter perfil do parceiro.{C_RESET}")
-                                input("\nPressione Enter para continuar...")
-                        elif opcao == "2":
-                            menu_justificativas(dados)
-                        elif opcao == "9":
-                            confirmar = input(f"\n{C_RED}Deseja realmente remover o vínculo com {parceiro_email}? (S/N): {C_RESET}").strip().upper()
-                            if confirmar == "S":
-                                supabase_client.desvincular_parceiro()
-                                print(f"\n{C_GREEN}Parceiro desvinculado com sucesso.{C_RESET}")
-                            else:
-                                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
-                            input("\nPressione Enter para continuar...")
-                        elif opcao == "0":
-                            break
-                    except KeyboardInterrupt:
-                        pass
+                    print(f"  [{C_CYAN}8{C_RESET}] 🚫 Remover Membro do Grupo")
+                    print(f"  [{C_CYAN}9{C_RESET}] 💥 Dissolver Grupo")
                 else:
-                    # Vínculo pendente (Usuário atual vinculou o parceiro, mas o parceiro ainda não vinculou de volta)
-                    parceiro_email = perfil_parceiro["email"] if perfil_parceiro else "Parceiro"
-                    print(f"  Solicitação de vínculo enviada para: {C_GREEN}{parceiro_email}{C_RESET}")
-                    print(f"  {C_YELLOW}Aguardando que ele insira seu código de convite para ativar o vínculo.{C_RESET}")
-                    print(f"  Seu código de convite para passar para ele: {C_BOLD}{C_GREEN}{perfil.get('codigo_convite')}{C_RESET}\n")
-                    print(f"  [{C_CYAN}9{C_RESET}] ❌ Cancelar Solicitação de Vínculo")
-                    print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
-                    print_divider()
-                    
-                    opcao = input("Escolha uma opção: ").strip()
-                    try:
-                        if opcao == "9":
-                            confirmar = input(f"\n{C_RED}Deseja realmente cancelar a solicitação para {parceiro_email}? (S/N): {C_RESET}").strip().upper()
-                            if confirmar == "S":
-                                supabase_client.desvincular_parceiro()
-                                print(f"\n{C_GREEN}Solicitação cancelada com sucesso.{C_RESET}")
-                            else:
-                                print(f"\n{C_YELLOW}Ação cancelada.{C_RESET}")
-                            input("\nPressione Enter para continuar...")
-                        elif opcao == "0":
-                            break
-                    except KeyboardInterrupt:
-                        pass
+                    print(f"  [{C_CYAN}1{C_RESET}] 📊 Acompanhar Consistência de um Membro")
+                    print(f"  [{C_CYAN}2{C_RESET}] 📝 Gerenciar Justificativas de Ausência (CRUD)")
+                    print(f"  [{C_CYAN}9{C_RESET}] 🚪 Sair do Grupo")
+                print(f"  [{C_CYAN}0{C_RESET}] ↩️ Voltar")
+                print_divider()
+
+                opcao = input("Escolha uma opção: ").strip()
+                try:
+                    if opcao == "1":
+                        selecionar_membro_para_acompanhar(dados)
+                    elif opcao == "2":
+                        menu_justificativas(dados)
+                    elif opcao == "8" and eh_admin:
+                        remover_membro_flow()
+                    elif opcao == "9":
+                        if eh_admin:
+                            dissolver_grupo_flow()
+                        else:
+                            sair_grupo_flow()
+                    elif opcao == "0":
+                        break
+                except KeyboardInterrupt:
+                    pass
         except KeyboardInterrupt:
             break

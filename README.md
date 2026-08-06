@@ -58,6 +58,14 @@ Cada sessão de estudo registrada gera um log contendo:
 ### 🚀 4. Auto-updater via GitHub
 Opção nativa no menu principal para verificar atualizações no repositório GitHub. Caso haja uma nova versão, o script realiza um `git pull` de forma automatizada e segura e reinicia a aplicação para aplicar as mudanças.
 
+### 👥 5. Grupo de Estudos (Responsabilidade Mútua)
+Forme grupos de estudo com 2 ou mais pessoas (sem limite de membros) para manter a constância em equipe:
+* **Criação e convite**: o criador do grupo (admin) gera um código único (`GR-XXXXXX`) e os demais entram com esse código.
+* **Dashboard do grupo**: resumo de todos os membros com status de estudo do dia, sequência de consistência (streak) e metas semanais cumpridas.
+* **Acompanhamento individual**: consulte o calendário de consistência, os logs detalhados por data e as justificativas de qualquer membro.
+* **Justificativas de ausência**: registre, edite ou exclua justificativas para dias sem estudo, visíveis para todo o grupo.
+* **Administração**: o criador pode remover membros e dissolver o grupo. Se o admin sair, a liderança é transferida automaticamente.
+
 ---
 
 ## 📐 O Algoritmo de Priorização
@@ -93,9 +101,12 @@ O espaçamento de revisões utiliza o algoritmo **SuperMemo-2 (SM2)** adaptado p
 ├── ciclo.py             # Arquivo principal / Entry-point e Loop do Menu
 ├── actions.py           # Submenus, Lógica de Telas, Registros e Logs
 ├── reviews.py           # Gerenciador de Revisões Espaçadas e SM2
+├── partner_menu.py      # Grupo de Estudos (menus, dashboard, justificativas)
+├── supabase_client.py   # Integração Supabase (auth, sync e grupos)
 ├── database.py          # Leitura/Escrita do JSON e migração automática de dados
 ├── utils.py             # Helpers para formatação de data, tempo e inputs
 ├── constants.py         # Cores ANSI e variáveis de configuração de tela
+├── migrar_grupos.sql    # Script SQL para criar as tabelas de grupos no Supabase
 ├── version.txt          # Arquivo contendo a versão atual instalada
 └── ciclo_estudos.json   # Banco de dados local (gerado automaticamente)
 ```
@@ -144,7 +155,10 @@ No menu principal, você terá acesso rápido às seções organizadas:
 * Digite **`3`** para **Revisões Estratégicas** (gerenciar revisões, registrar acertos de questões).
 * Digite **`4`** para acessar seus **Históricos** (ver logs detalhados das suas sessões).
 * Digite **`5`** para buscar **Atualizações** do script.
+* Digite **`6`** para acessar o **Grupo de Estudos** (criar/entrar em grupo, acompanhar membros e gerenciar justificativas).
 * Digite **`0`** para **Salvar e Sair** da aplicação.
+
+> **ℹ️ Grupo de Estudos**: para usar esse recurso, execute o script `migrar_grupos.sql` no SQL Editor do Supabase. Ele cria as tabelas `grupos` e `membros_grupo` e converte automaticamente vínculos de parceiro antigos em grupos.
 
 ---
 <div align="center">

@@ -189,64 +189,6 @@ def obter_perfil() -> dict:
         pass
     return None
 
-def vincular_parceiro(codigo_convite: str):
-    """Vincula um parceiro de estudos utilizando o código de convite."""
-    if not esta_configurado():
-        raise Exception("Supabase não configurado.")
-    
-    current_user_id = obter_id_usuario()
-    if not current_user_id:
-        raise Exception("Usuário não autenticado.")
-        
-    # Busca o perfil alvo
-    res = supabase.table("perfis_usuario").select("*").eq("codigo_convite", codigo_convite.strip().upper()).execute()
-    if not res.data:
-        raise Exception("Código de convite inválido ou não encontrado.")
-        
-    alvo = res.data[0]
-    alvo_user_id = alvo["user_id"]
-    
-    if alvo_user_id == current_user_id:
-        raise Exception("Você não pode vincular seu próprio código!")
-        
-    # Busca perfil atual
-    res_atual = supabase.table("perfis_usuario").select("*").eq("user_id", current_user_id).execute()
-    
-    if res_atual.data:
-        perfil_atual = res_atual.data[0]
-        # Se o parceiro já me vinculou, já estamos vinculados mutuamente no banco. Retorna com sucesso kkk
-        if perfil_atual.get("parceiro_id") == alvo_user_id:
-            return
-        if perfil_atual.get("parceiro_id"):
-            raise Exception("Você já possui um parceiro de estudos. Desvincule-o primeiro.")
-            
-    if alvo.get("parceiro_id") and alvo.get("parceiro_id") != current_user_id:
-        raise Exception("Este usuário já possui um parceiro de estudos.")
-        
-    # Vincula mutuamente
-    try:
-        supabase.table("perfis_usuario").update({"parceiro_id": alvo_user_id}).eq("user_id", current_user_id).execute()
-        supabase.table("perfis_usuario").update({"parceiro_id": current_user_id}).eq("user_id", alvo_user_id).execute()
-    except Exception as e:
-        raise Exception(f"Erro ao salvar vínculo: {e}")
-
-def desvincular_parceiro():
-    """Remove o vínculo mútuo entre o usuário atual e seu parceiro."""
-    if not esta_configurado():
-        return
-    current_user_id = obter_id_usuario()
-    if not current_user_id:
-        return
-    try:
-        perfil = obter_perfil()
-        if perfil and perfil.get("parceiro_id"):
-            parceiro_id = perfil["parceiro_id"]
-            # Desvincula ambos
-            supabase.table("perfis_usuario").update({"parceiro_id": None}).eq("user_id", current_user_id).execute()
-            supabase.table("perfis_usuario").update({"parceiro_id": None}).eq("user_id", parceiro_id).execute()
-    except Exception:
-        pass
-
 def obter_perfil_por_id(user_id: str) -> dict:
     """Busca um perfil específico pelo user_id."""
     if not esta_configurado() or not user_id:
@@ -259,17 +201,200 @@ def obter_perfil_por_id(user_id: str) -> dict:
         pass
     return None
 
-def baixar_dados_parceiro(parceiro_id: str) -> dict:
-    """Busca dados de progresso do parceiro de estudos."""
-    if not esta_configurado() or not parceiro_id:
+def baixar_dados_membro(membro_id: str) -> dict:
+    """Busca dados de progresso de um membro do grupo de estudos."""
+    if not esta_configurado() or not membro_id:
         return None
     try:
-        response = supabase.table("ciclos_usuario").select("dados").eq("user_id", parceiro_id).execute()
+        response = supabase.table("ciclos_usuario").select("dados").eq("user_id", membro_id).execute()
         if response.data and len(response.data) > 0:
             return response.data[0].get("dados")
     except Exception:
         pass
     return None
+
+def obter_grupo_do_usuario() -> dict:
+    """Retorna o grupo do usuário atual (info + ids dos membros) ou None."""
+    if not esta_configurado():
+        return None
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        return None
+    try:
+        res = supabase.table("membros_grupo").select("grupo_id").eq("user_id", current_user_id).execute()
+        if not res.data:
+            return None
+        grupo_id = res.data[0]["grupo_id"]
+
+        grupo_res = supabase.table("grupos").select("*").eq("id", grupo_id).execute()
+        if not grupo_res.data:
+            return None
+        grupo = grupo_res.data[0]
+
+        membros_res = supabase.table("membros_grupo").select("user_id").eq("grupo_id", grupo_id).execute()
+        membros_ids = [m["user_id"] for m in membros_res.data] if membros_res.data else []
+
+        if grupo["criador_id"] not in membros_ids:
+            membros_ids.append(grupo["criador_id"])
+
+        return {
+            "grupo": grupo,
+            "membros_ids": membros_ids
+        }
+    except Exception:
+        return None
+
+def listar_membros_grupo() -> list:
+    """Retorna a lista de perfis dos membros do grupo do usuário atual."""
+    info = obter_grupo_do_usuario()
+    if not info:
+        return []
+    membros = []
+    for uid in info["membros_ids"]:
+        perfil = obter_perfil_por_id(uid)
+        if perfil:
+            membros.append(perfil)
+    return membros
+
+def criar_grupo() -> str:
+    """Cria um novo grupo de estudos e torna o usuário atual o admin (criador).
+    Retorna o código de convite gerado (GR-XXXXXX)."""
+    if not esta_configurado():
+        raise Exception("Supabase não configurado.")
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        raise Exception("Usuário não autenticado.")
+
+    if obter_grupo_do_usuario():
+        raise Exception("Você já está em um grupo de estudos.")
+
+    import random
+    import string
+
+    codigo = None
+    for _ in range(10):
+        code_suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        codigo = f"GR-{code_suffix}"
+        check = supabase.table("grupos").select("codigo_convite").eq("codigo_convite", codigo).execute()
+        if not check.data:
+            break
+    else:
+        raise Exception("Não foi possível gerar um código único. Tente novamente.")
+
+    try:
+        res = supabase.table("grupos").insert({
+            "codigo_convite": codigo,
+            "criador_id": current_user_id
+        }).execute()
+        grupo_id = res.data[0]["id"]
+        supabase.table("membros_grupo").insert({
+            "grupo_id": grupo_id,
+            "user_id": current_user_id
+        }).execute()
+    except Exception as e:
+        raise Exception(f"Erro ao criar grupo: {e}")
+
+    return codigo
+
+def entrar_grupo(codigo_convite: str):
+    """Faz o usuário atual entrar em um grupo existente pelo código de convite."""
+    if not esta_configurado():
+        raise Exception("Supabase não configurado.")
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        raise Exception("Usuário não autenticado.")
+
+    if obter_grupo_do_usuario():
+        raise Exception("Você já está em um grupo de estudos. Saia dele primeiro.")
+
+    codigo = codigo_convite.strip().upper()
+    res = supabase.table("grupos").select("*").eq("codigo_convite", codigo).execute()
+    if not res.data:
+        raise Exception("Código de convite inválido ou não encontrado.")
+
+    grupo = res.data[0]
+    grupo_id = grupo["id"]
+
+    if grupo["criador_id"] == current_user_id:
+        raise Exception("Você já é o criador deste grupo.")
+
+    try:
+        supabase.table("membros_grupo").insert({
+            "grupo_id": grupo_id,
+            "user_id": current_user_id
+        }).execute()
+    except Exception:
+        raise Exception("Não foi possível entrar no grupo. Você pode já estar em outro grupo.")
+
+def sair_grupo():
+    """Remove o usuário atual do grupo. Se for o admin, transfere a liderança
+    para outro membro ou dissolve o grupo quando for o último membro."""
+    if not esta_configurado():
+        return
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        return
+    try:
+        info = obter_grupo_do_usuario()
+        if not info:
+            return
+        grupo = info["grupo"]
+        grupo_id = grupo["id"]
+
+        if grupo["criador_id"] == current_user_id:
+            outros = [uid for uid in info["membros_ids"] if uid != current_user_id]
+            if outros:
+                novo_admin = outros[0]
+                supabase.table("grupos").update({"criador_id": novo_admin}).eq("id", grupo_id).execute()
+            else:
+                dissolver_grupo()
+                return
+
+        supabase.table("membros_grupo").delete().eq("user_id", current_user_id).execute()
+    except Exception:
+        pass
+
+def remover_membro(user_id: str):
+    """Admin remove um membro específico do grupo."""
+    if not esta_configurado():
+        raise Exception("Supabase não configurado.")
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        raise Exception("Usuário não autenticado.")
+
+    info = obter_grupo_do_usuario()
+    if not info:
+        raise Exception("Você não está em um grupo de estudos.")
+    grupo = info["grupo"]
+
+    if grupo["criador_id"] != current_user_id:
+        raise Exception("Somente o administrador do grupo pode remover membros.")
+
+    if user_id == current_user_id:
+        raise Exception("Você não pode remover a si mesmo. Use a opção 'Sair do Grupo'.")
+
+    try:
+        supabase.table("membros_grupo").delete().eq("user_id", user_id).execute()
+    except Exception as e:
+        raise Exception(f"Erro ao remover membro: {e}")
+
+def dissolver_grupo():
+    """Admin dissolve o grupo inteiro, removendo todos os membros."""
+    if not esta_configurado():
+        return
+    current_user_id = obter_id_usuario()
+    if not current_user_id:
+        return
+    try:
+        info = obter_grupo_do_usuario()
+        if not info:
+            return
+        grupo = info["grupo"]
+        if grupo["criador_id"] != current_user_id:
+            raise Exception("Somente o administrador do grupo pode dissolvê-lo.")
+        supabase.table("grupos").delete().eq("id", grupo["id"]).execute()
+    except Exception:
+        pass
 
 
 

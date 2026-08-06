@@ -251,7 +251,7 @@ def main():
             print(f"  [{C_CYAN}3{C_RESET}] 🔄 Revisões Estratégicas (Repetição Espaçada)")
             print(f"  [{C_CYAN}4{C_RESET}] 📜 Históricos de Estudos (Ciclos e Sessões)")
             print(f"  [{C_CYAN}5{C_RESET}] 🚀 Verificar Atualizações")
-            print(f"  [{C_CYAN}6{C_RESET}] 🤝 Parceiro de Estudos")
+            print(f"  [{C_CYAN}6{C_RESET}] 👥 Grupo de Estudos")
             print(f"  [{C_CYAN}9{C_RESET}] 🚪 Deslogar / Alternar Conta")
             print(f"  [{C_CYAN}0{C_RESET}] 💾 Salvar e Sair")
             print_divider()
@@ -270,7 +270,7 @@ def main():
                 elif opcao == "5":
                     verificar_atualizacao(dados)
                 elif opcao == "6":
-                    partner_menu.menu_parceria(dados)
+                    partner_menu.menu_grupo(dados)
                 elif opcao == "9":
                     clear_screen()
                     print_header("DESCONECTANDO")
