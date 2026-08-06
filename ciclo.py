@@ -41,6 +41,35 @@ def e_vazio(dados: dict) -> bool:
     horas = dados.get("horas_semanais", 0.0)
     return len(materias) == 0 and horas == 0.0
 
+def revalidar_sessao(email):
+    """Refaz o login de um perfil salvo cuja sessão expirou, com o e-mail já preenchido.
+    Retorna o usuário autenticado ou None se o usuário cancelar."""
+    while True:
+        clear_screen()
+        print_header("SESSÃO EXPIRADA - REVALIDAR ACESSO")
+        print(f"\n  Conta: {C_CYAN}{email}{C_RESET}")
+        print("  Digite a senha para revalidar o acesso.")
+        print(f"  (ou pressione {C_CYAN}0{C_RESET} na senha para voltar)\n")
+        print_divider()
+
+        senha = getpass.getpass("  Senha: ")
+        if senha.strip() == "0":
+            return None
+        if not senha:
+            print(f"\n{C_RED}Senha não pode ser vazia.{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+            continue
+
+        print(f"\n{C_YELLOW}Autenticando...{C_RESET}")
+        try:
+            usuario = supabase_client.fazer_login(email, senha)
+            print(f"\n{C_GREEN}✔ Acesso revalidado! Bem-vindo(a), {usuario.email}!{C_RESET}")
+            input("\nPressione Enter para continuar...")
+            return usuario
+        except Exception as e:
+            print(f"\n{C_RED}Erro ao revalidar: {e}{C_RESET}")
+            input("\nPressione Enter para tentar novamente...")
+
 def tela_login(adicionar_perfil=False):
     """Tela de login/cadastro tradicional. Retorna o usuário autenticado ou None (sair)."""
     while True:
@@ -171,11 +200,13 @@ def selecionar_perfil():
                         input("\nPressione Enter para continuar...")
                         return usuario
                     else:
-                        print(f"\n{C_RED}Não foi possível restaurar a sessão deste perfil (pode ter expirado).{C_RESET}")
-                        print(f"{C_YELLOW}Você precisará refazer o login desta conta.{C_RESET}")
+                        print(f"\n{C_RED}⚠ A sessão deste perfil expirou.{C_RESET}")
+                        print(f"{C_YELLOW}Digite a senha da conta {email} para revalidar o acesso.{C_RESET}")
                         input("\nPressione Enter para continuar...")
-                        supabase_client.excluir_perfil(email)
-                        return tela_login(adicionar_perfil=True)
+                        usuario = revalidar_sessao(email)
+                        if usuario:
+                            return usuario
+                        # Se cancelou, volta ao seletor; o perfil permanece salvo
                 else:
                     print(f"\n{C_RED}Opção inválida!{C_RESET}")
                     input("\nPressione Enter para tentar novamente...")
