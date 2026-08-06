@@ -3,6 +3,12 @@ ciclo_estudos.json
 ciclo_estudos.json.backup*
 ciclo_estudos.json.tmp
 
+# Logs
+ciclo.log
+
+# Testes
+.pytest_cache/
+
 # Cache do Python
 __pycache__/
 *.pyc

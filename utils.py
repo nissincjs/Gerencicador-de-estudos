@@ -1,9 +1,9 @@
 import os
-import re
 import shutil
 from constants import (
     C_CYAN, C_GREEN, C_YELLOW, C_RED, C_MAGENTA, C_BLUE, C_BOLD, C_RESET
 )
+from calculo import parse_tempo_input, formatar_horas_minutos, parse_data_hora_input
 
 def obter_largura_ui(largura_max=115):
     """Retorna a largura ideal da UI dinâmica com base no terminal atual."""
@@ -221,82 +221,6 @@ def obter_input_str(prompt, obrigatorio=True, default=None, largura_ref=None):
             continue
         return entrada
 
-def parse_tempo_input(entrada):
-    """Interpreta formatos de tempo flexíveis como '1.5', '1:30', '1:30:12', '90m', '1h30m12s', etc."""
-    entrada = entrada.strip().lower()
-    if not entrada:
-        raise ValueError("Entrada vazia")
-        
-    # 1. Formato com dois pontos (ex: 1:30:12 ou 1:30)
-    if ":" in entrada:
-        partes = entrada.split(":")
-        if len(partes) == 3:
-            h = float(partes[0])
-            m = float(partes[1])
-            s = float(partes[2])
-            if h < 0 or m < 0 or m >= 60 or s < 0 or s >= 60:
-                raise ValueError("Valores de horas/minutos/segundos inválidos.")
-            return h + m / 60.0 + s / 3600.0
-        elif len(partes) == 2:
-            h = float(partes[0])
-            m = float(partes[1])
-            if h < 0 or m < 0 or m >= 60:
-                raise ValueError("Minutos devem estar entre 0 e 59.")
-            return h + m / 60.0
-            
-    # 2. Formato com sufixos (h, m, s)
-    if any(char in entrada for char in ['h', 'm', 's']):
-        horas = 0.0
-        minutos = 0.0
-        segundos = 0.0
-        
-        match_h = re.search(r'(\d+(?:\.\d+)?)\s*(?:h|hs|hora|horas)', entrada)
-        if match_h:
-            horas = float(match_h.group(1))
-            
-        match_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:m|min|minuto|minutos)', entrada)
-        if match_m:
-            minutos = float(match_m.group(1))
-            
-        match_s = re.search(r'(\d+(?:\.\d+)?)\s*(?:s|seg|segundo|segundos)', entrada)
-        if match_s:
-            segundos = float(match_s.group(1))
-            
-        # Validar se conseguimos extrair alguma coisa válida
-        if not match_h and not match_m and not match_s:
-            raise ValueError("Não foi possível extrair tempo válido do formato com sufixos.")
-            
-        return horas + minutos / 60.0 + segundos / 3600.0
-        
-    # 3. Decimal simples (ex: 1.5)
-    return float(entrada)
-
-def formatar_horas_minutos(horas_decimais):
-    """Converte horas decimais em formato legível como 'Xh YYm ZZs', 'YYm ZZs' ou 'ZZs'."""
-    if horas_decimais <= 0:
-        return "0s"
-        
-    total_segundos = round(horas_decimais * 3600)
-    if total_segundos <= 0:
-        return "0s"
-        
-    horas = total_segundos // 3600
-    minutos = (total_segundos % 3600) // 60
-    segundos = total_segundos % 60
-    
-    partes = []
-    if horas > 0:
-        partes.append(f"{horas}h")
-    if minutos > 0:
-        partes.append(f"{minutos}m")
-    if segundos > 0:
-        partes.append(f"{segundos}s")
-        
-    if not partes:
-        return "0s"
-        
-    return " ".join(partes)
-
 def ajustar_zoom_console(passos=1):
     """Ajusta o nível de zoom do terminal enviando atalhos de teclado (Ctrl + + / Ctrl + Shift + +)."""
     if os.name == 'nt':
@@ -423,89 +347,3 @@ def auto_ajustar_zoom():
     _tamanho_terminal_ultimo_ajuste = (cols, rows)
     _ultimo_ajuste_zoom = time.time()
 
-def parse_data_hora_input(entrada, default_str):
-    """
-    Analisa um input de data/hora flexível com base em uma data/hora de referência.
-    Formatos aceitos:
-      - Apenas dia (ex: "4" -> 04/Mês/Ano Hora:Minuto:Segundo)
-      - Dia e mês (ex: "4/7" -> 04/07/Ano Hora:Minuto:Segundo)
-      - Dia, mês e ano (ex: "4/7/26" ou "4/7/2026")
-      - Apenas hora (ex: "15:30" ou "15:30:10")
-      - Data e hora (ex: "4 15:30", "4/7 15:30:10")
-    """
-    from datetime import datetime
-    
-    entrada = entrada.strip()
-    if not entrada:
-        return default_str
-        
-    try:
-        ref = datetime.strptime(default_str, "%d/%m/%Y %H:%M:%S")
-    except Exception:
-        ref = datetime.now()
-        
-    dia = ref.day
-    mes = ref.month
-    ano = ref.year
-    hora = ref.hour
-    minuto = ref.minute
-    segundo = ref.second
-    
-    partes = entrada.split()
-    
-    def parse_data_part(dp):
-        nonlocal dia, mes, ano
-        dt_partes = dp.split('/')
-        if len(dt_partes) == 1:
-            dia = int(dt_partes[0])
-        elif len(dt_partes) == 2:
-            dia = int(dt_partes[0])
-            mes = int(dt_partes[1])
-        elif len(dt_partes) == 3:
-            dia = int(dt_partes[0])
-            mes = int(dt_partes[1])
-            ano_str = dt_partes[2]
-            if len(ano_str) == 2:
-                ano = 2000 + int(ano_str)
-            else:
-                ano = int(ano_str)
-        else:
-            raise ValueError("Formato de data inválido")
-
-    def parse_time_part(tp):
-        nonlocal hora, minuto, segundo
-        tm_partes = tp.split(':')
-        if len(tm_partes) == 2:
-            hora = int(tm_partes[0])
-            minuto = int(tm_partes[1])
-            segundo = 0
-        elif len(tm_partes) == 3:
-            hora = int(tm_partes[0])
-            minuto = int(tm_partes[1])
-            segundo = int(tm_partes[2])
-        else:
-            raise ValueError("Formato de hora inválido")
-
-    try:
-        if len(partes) == 1:
-            p = partes[0]
-            if ':' in p:
-                parse_time_part(p)
-            else:
-                parse_data_part(p)
-        elif len(partes) == 2:
-            p1, p2 = partes[0], partes[1]
-            if ':' in p1:
-                parse_time_part(p1)
-                parse_data_part(p2)
-            else:
-                parse_data_part(p1)
-                parse_time_part(p2)
-        else:
-            raise ValueError("Muitos espaços no formato")
-            
-        # Valida a data construindo um objeto datetime
-        dt = datetime(ano, mes, dia, hora, minuto, segundo)
-        return dt.strftime("%d/%m/%Y %H:%M:%S")
-    except ValueError as e:
-        raise ValueError(f"valores inválidos ({e})")

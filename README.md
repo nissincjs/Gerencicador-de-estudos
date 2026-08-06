@@ -109,11 +109,16 @@ O espaçamento de revisões utiliza o algoritmo **SuperMemo-2 (SM2)** adaptado p
 ├── actions.py           # Submenus, Lógica de Telas, Registros e Logs
 ├── reviews.py           # Gerenciador de Revisões Espaçadas e SM2
 ├── partner_menu.py      # Grupo de Estudos (menus, dashboard, justificativas)
+├── calculo.py           # Lógica pura de cálculo (SM2, streak, tempo, métricas)
 ├── supabase_client.py   # Integração Supabase (auth, sync e grupos)
 ├── database.py          # Leitura/Escrita do JSON e migração automática de dados
-├── utils.py             # Helpers para formatação de data, tempo e inputs
+├── logger.py            # Configuração de log (ciclo.log)
+├── utils.py             # Helpers de UI (tela, inputs, cores)
 ├── constants.py         # Cores ANSI e variáveis de configuração de tela
 ├── setup_banco.sql      # Script SQL completo (tabelas + políticas + migração) para o Supabase
+├── requirements.txt     # Dependências de execução
+├── requirements-dev.txt # Dependências de desenvolvimento (pytest)
+├── tests/               # Testes automatizados
 ├── version.txt          # Arquivo contendo a versão atual instalada
 └── ciclo_estudos.json   # Banco de dados local (gerado automaticamente)
 ```
@@ -172,6 +177,22 @@ No menu principal, você terá acesso rápido às seções organizadas:
 * Digite **`0`** para **Salvar e Sair** da aplicação.
 
 > **ℹ️ Configuração do banco**: execute o script `setup_banco.sql` no SQL Editor do Supabase. Ele cria **todas** as tabelas (`perfis_usuario`, `ciclos_usuario`, `grupos` e `membros_grupo`) e as políticas de acesso. Funciona em banco novo e, em banco antigo, converte automaticamente vínculos de parceiro em grupos e remove o legado. É idempotente (pode rodar quantas vezes quiser).
+
+---
+
+## 🧪 Testes
+
+Os testes automatizados cobrem o núcleo de lógica (SM2, streak, tempo, banco de dados local) e não dependem de rede nem do Supabase.
+
+```bash
+# Instalar as dependências de desenvolvimento
+venv/bin/pip install -r requirements-dev.txt
+
+# Rodar os testes
+venv/bin/python -m pytest tests/ -v
+```
+
+Os erros de execução do app são registrados no arquivo `ciclo.log` (gerado automaticamente, ignorado pelo Git) para facilitar o diagnóstico sem poluir o terminal.
 
 ---
 <div align="center">

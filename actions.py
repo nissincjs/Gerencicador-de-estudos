@@ -9,6 +9,7 @@ from utils import (
     set_largura_atual, reset_largura_atual, parse_data_hora_input
 )
 from database import salvar_dados
+from calculo import calcular_metricas_acompanhamento
 
 def exibir_ciclo(dados, pausar=True):
     """Exibe o ciclo de estudos calculado com progresso em formato de tabela estilizada (responsiva e centralizada)."""
@@ -910,129 +911,6 @@ def configuracao_inicial(dados):
     salvar_dados(dados)
     print(f"\n{C_GREEN}✔ Configuração inicial concluída com sucesso!{C_RESET}")
     input("\nPressione Enter para acessar o Menu Principal...")
-
-def calcular_metricas_acompanhamento(dados):
-    from datetime import datetime, timedelta
-    
-    # 1. Carga horária total do ciclo
-    horas_totais = dados.get("horas_semanais", 0.0)
-    
-    # 2. Total estudado no ciclo atual
-    progresso = dados.get("progresso_atual", {})
-    total_estudado = sum(progresso.values())
-    
-    # 3. Tempo restante no ciclo
-    horas_restantes = max(0.0, horas_totais - total_estudado)
-    
-    # 4. Percentual concluído
-    pct_concluido = (total_estudado / horas_totais * 100) if horas_totais > 0 else 0.0
-    
-    # 5. Dias/tempo decorrido no ciclo atual
-    data_inicio_str = dados.get("data_inicio_ciclo")
-    dt_inicio = None
-    dias_no_ciclo = 0.0
-    if data_inicio_str:
-        try:
-            dt_inicio = datetime.strptime(data_inicio_str, "%d/%m/%Y %H:%M:%S")
-            dias_no_ciclo = (datetime.now() - dt_inicio).total_seconds() / 86400.0
-        except Exception:
-            pass
-            
-    if dias_no_ciclo < 0.0:
-        dias_no_ciclo = 0.0
-        
-    # 6. Médias semanais baseadas no histórico geral de sessões de estudo
-    sessoes = dados.get("historico_sessoes", [])
-    sessoes_registro = [s for s in sessoes if s.get("tipo") == "registro"]
-    total_horas_historico = sum(s.get("horas", 0.0) for s in sessoes_registro)
-    
-    datas = []
-    for s in sessoes_registro:
-        try:
-            dt = datetime.strptime(s["data"], "%d/%m/%Y %H:%M:%S")
-            datas.append(dt)
-        except Exception:
-            pass
-            
-    if datas:
-        dt_primeira = min(datas)
-        dias_desde_inicio = (datetime.now() - dt_primeira).total_seconds() / 86400.0
-        semanas_desde_inicio = max(1.0 / 7.0, dias_desde_inicio / 7.0)
-        media_semanal_historica = total_horas_historico / semanas_desde_inicio
-    else:
-        media_semanal_historica = 0.0
-        dias_desde_inicio = 0.0
-        
-    # 7. Horas nos últimos 7 e 30 dias
-    agora = datetime.now()
-    horas_ultimos_7_dias = 0.0
-    horas_ultimos_30_dias = 0.0
-    for s in sessoes_registro:
-        try:
-            dt = datetime.strptime(s["data"], "%d/%m/%Y %H:%M:%S")
-            dias_atras = (agora - dt).total_seconds() / 86400.0
-            if dias_atras <= 7.0:
-                horas_ultimos_7_dias += s.get("horas", 0.0)
-            if dias_atras <= 30.0:
-                horas_ultimos_30_dias += s.get("horas", 0.0)
-        except Exception:
-            pass
-            
-    if datas:
-        dias_para_divisor_30 = min(30.0, max(1.0, dias_desde_inicio))
-        media_semanal_30_dias = (horas_ultimos_30_dias / dias_para_divisor_30) * 7.0
-    else:
-        media_semanal_30_dias = 0.0
-        
-    # 8. Estimativa de ritmo diário (horas/dia)
-    ritmo_diario_historico = total_horas_historico / max(1.0, dias_desde_inicio) if datas else 0.0
-    
-    if total_estudado > 0.0:
-        if dias_no_ciclo >= 1.0:
-            ritmo_diario = total_estudado / dias_no_ciclo
-            origem_ritmo = "Ciclo Atual"
-        else:
-            if ritmo_diario_historico > 0.0:
-                ritmo_diario = ritmo_diario_historico
-                origem_ritmo = "Média Histórica Geral"
-            else:
-                ritmo_diario = total_estudado / max(0.5, dias_no_ciclo)
-                origem_ritmo = "Ciclo Atual (Estimativa)"
-    else:
-        if ritmo_diario_historico > 0.0:
-            ritmo_diario = ritmo_diario_historico
-            origem_ritmo = "Média Histórica Geral"
-        else:
-            ritmo_diario = 0.0
-            origem_ritmo = "Sem dados de estudo"
-            
-    # Ritmo ideal diário para fechar o ciclo em 7 dias
-    ritmo_ideal_diario = horas_totais / 7.0 if horas_totais > 0 else 0.0
-    
-    # Previsão de conclusão do ciclo
-    if ritmo_diario > 0.0:
-        dias_para_concluir = horas_restantes / ritmo_diario
-        previsao_conclusao = agora + timedelta(days=dias_para_concluir)
-    else:
-        dias_para_concluir = None
-        previsao_conclusao = None
-        
-    return {
-        "horas_totais": horas_totais,
-        "total_estudado": total_estudado,
-        "horas_restantes": horas_restantes,
-        "pct_concluido": pct_concluido,
-        "dias_no_ciclo": dias_no_ciclo,
-        "media_semanal_historica": media_semanal_historica,
-        "horas_ultimos_7_dias": horas_ultimos_7_dias,
-        "media_semanal_30_dias": media_semanal_30_dias,
-        "ritmo_diario": ritmo_diario,
-        "origem_ritmo": origem_ritmo,
-        "ritmo_ideal_diario": ritmo_ideal_diario,
-        "dias_para_concluir": dias_para_concluir,
-        "previsao_conclusao": previsao_conclusao,
-        "dt_inicio": dt_inicio
-    }
 
 def exibir_acompanhamento_ciclo(dados, pausar=True):
     clear_screen()

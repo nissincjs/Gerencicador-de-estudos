@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from logger import logger
 
 # Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -13,14 +14,22 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY and not (SUPABASE_URL.startswith("https://sua-url-do-supabase") or SUPABASE_KEY.startswith("sua-anon-key")):
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Falha ao inicializar o cliente do Supabase: %s", e)
 
 import json
 from datetime import datetime
 
 SESSION_FILE = ".session.json"
 PROFILES_FILE = ".profiles.json"
+
+# Cache do ID do usuário autenticado para evitar requisições de rede repetidas
+_user_id_cacheado = None
+
+def _limpar_cache_usuario():
+    """Invalida o cache do ID do usuário (deve ser chamado em mudanças de sessão)."""
+    global _user_id_cacheado
+    _user_id_cacheado = None
 
 def esta_configurado() -> bool:
     """Verifica se o Supabase está configurado corretamente no .env."""
@@ -38,8 +47,8 @@ def salvar_sessao(session, email=None):
         }
         with open(SESSION_FILE, "w", encoding="utf-8") as f:
             json.dump(dados_sessao, f)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Não foi possível salvar a sessão local: %s", e)
     if email:
         salvar_sessao_perfil(session, email)
 
@@ -47,11 +56,12 @@ def limpar_sessao_local():
     """Remove apenas a sessão ativa local, mantendo os perfis salvos.
     Usado para trocar de perfil sem revogar os tokens (rápido e seguro
     em dispositivos compartilhados)."""
+    _limpar_cache_usuario()
     if os.path.exists(SESSION_FILE):
         try:
             os.remove(SESSION_FILE)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Não foi possível remover a sessão local: %s", e)
 
 def limpar_sessao():
     """Remove a sessão ativa local. Os perfis salvos permanecem disponíveis
@@ -62,6 +72,7 @@ def recuperar_sessao_salva():
     """Tenta restaurar a sessão do usuário a partir dos tokens salvos localmente."""
     if not esta_configurado():
         return None
+    _limpar_cache_usuario()
     if os.path.exists(SESSION_FILE):
         try:
             with open(SESSION_FILE, "r", encoding="utf-8") as f:
@@ -81,7 +92,8 @@ def recuperar_sessao_salva():
                         dados_profiles["active"] = user.email
                         _salvar_profiles_file(dados_profiles)
                 return user
-        except Exception:
+        except Exception as e:
+            logger.warning("Não foi possível restaurar a sessão salva: %s", e)
             limpar_sessao()
     return None
 
@@ -93,8 +105,8 @@ def _carregar_profiles_file() -> dict:
         if isinstance(dados, dict):
             dados.setdefault("profiles", {})
             return dados
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Não foi possível ler o arquivo de perfis: %s", e)
     return {"profiles": {}}
 
 def _salvar_profiles_file(dados: dict):
@@ -102,8 +114,8 @@ def _salvar_profiles_file(dados: dict):
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
             json.dump(dados, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Não foi possível salvar o arquivo de perfis: %s", e)
 
 def listar_perfis() -> list:
     """Retorna a lista de perfis salvos (email + data de adição)."""
@@ -120,6 +132,7 @@ def salvar_sessao_perfil(session, email):
     """Salva/atualiza os tokens da sessão no perfil correspondente ao email."""
     if not session or not email:
         return
+    _limpar_cache_usuario()
     try:
         dados = _carregar_profiles_file()
         perfil = dados["profiles"].setdefault(email, {})
@@ -129,13 +142,14 @@ def salvar_sessao_perfil(session, email):
             perfil["added_at"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         dados["active"] = email
         _salvar_profiles_file(dados)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Não foi possível salvar o perfil %s: %s", email, e)
 
 def ativar_perfil(email: str):
     """Restaura a sessão de um perfil salvo pelo email. Retorna o usuário ou None."""
     if not esta_configurado() or not email:
         return None
+    _limpar_cache_usuario()
     dados = _carregar_profiles_file()
     info = dados.get("profiles", {}).get(email)
     if not info:
@@ -158,13 +172,15 @@ def ativar_perfil(email: str):
         else:
             salvar_sessao(info)
         return user
-    except Exception:
+    except Exception as e:
+        logger.warning("Falha ao ativar o perfil %s: %s", email, e)
         return None
 
 def excluir_perfil(email: str):
     """Remove um perfil salvo do dispositivo."""
     if not email:
         return
+    _limpar_cache_usuario()
     dados = _carregar_profiles_file()
     if email in dados.get("profiles", {}):
         del dados["profiles"][email]
@@ -176,6 +192,7 @@ def fazer_login(email, password):
     """Realiza o login com email e senha no Supabase."""
     if not esta_configurado():
         raise Exception("Supabase não está configurado. Verifique o arquivo .env.")
+    _limpar_cache_usuario()
     try:
         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
         if response.session:
@@ -194,6 +211,7 @@ def fazer_cadastro(email, password):
     """Realiza o cadastro de um novo usuário no Supabase."""
     if not esta_configurado():
         raise Exception("Supabase não está configurado. Verifique o arquivo .env.")
+    _limpar_cache_usuario()
     try:
         response = supabase.auth.sign_up({"email": email, "password": password})
         if response.session:
@@ -203,15 +221,20 @@ def fazer_cadastro(email, password):
         raise Exception(str(e))
 
 def obter_id_usuario() -> str:
-    """Retorna o ID do usuário atualmente autenticado ou None."""
+    """Retorna o ID do usuário atualmente autenticado ou None.
+    Usa cache em memória para evitar requisições de rede repetidas."""
     if not esta_configurado():
         return None
+    global _user_id_cacheado
+    if _user_id_cacheado:
+        return _user_id_cacheado
     try:
         res = supabase.auth.get_user()
         if res and res.user:
-            return res.user.id
-    except Exception:
-        pass
+            _user_id_cacheado = res.user.id
+            return _user_id_cacheado
+    except Exception as e:
+        logger.debug("Falha ao obter o ID do usuário: %s", e)
     return None
 
 def enviar_dados_nuvem(dados: dict) -> bool:
@@ -233,7 +256,8 @@ def enviar_dados_nuvem(dados: dict) -> bool:
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning("Falha ao enviar dados para a nuvem: %s", e)
         return False
 
 def baixar_dados_nuvem() -> dict:
@@ -247,8 +271,8 @@ def baixar_dados_nuvem() -> dict:
         response = supabase.table("ciclos_usuario").select("dados").eq("user_id", user_id).execute()
         if response.data and len(response.data) > 0:
             return response.data[0].get("dados")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Falha ao baixar dados da nuvem: %s", e)
     return None
 
 def garantir_perfil_criado(user_id: str, email: str):
@@ -275,8 +299,8 @@ def garantir_perfil_criado(user_id: str, email: str):
                     }).execute()
                     break
                 tentativas += 1
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Falha ao garantir a criação do perfil: %s", e)
 
 def obter_perfil() -> dict:
     """Retorna o perfil do usuário logado na tabela perfis_usuario."""
@@ -289,8 +313,8 @@ def obter_perfil() -> dict:
         res = supabase.table("perfis_usuario").select("*").eq("user_id", user_id).execute()
         if res.data:
             return res.data[0]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Falha ao obter o perfil do usuário atual: %s", e)
     return None
 
 def obter_perfil_por_id(user_id: str) -> dict:
@@ -301,8 +325,8 @@ def obter_perfil_por_id(user_id: str) -> dict:
         res = supabase.table("perfis_usuario").select("*").eq("user_id", user_id).execute()
         if res.data:
             return res.data[0]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Falha ao obter o perfil %s: %s", user_id, e)
     return None
 
 def baixar_dados_membro(membro_id: str) -> dict:
@@ -313,8 +337,8 @@ def baixar_dados_membro(membro_id: str) -> dict:
         response = supabase.table("ciclos_usuario").select("dados").eq("user_id", membro_id).execute()
         if response.data and len(response.data) > 0:
             return response.data[0].get("dados")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Falha ao baixar dados do membro %s: %s", membro_id, e)
     return None
 
 def obter_grupo_do_usuario() -> dict:
@@ -345,8 +369,9 @@ def obter_grupo_do_usuario() -> dict:
             "grupo": grupo,
             "membros_ids": membros_ids
         }
-    except Exception:
-        return None
+    except Exception as e:
+        logger.debug("Falha ao obter o grupo do usuário: %s", e)
+    return None
 
 def listar_membros_grupo() -> list:
     """Retorna a lista de perfis dos membros do grupo do usuário atual."""
@@ -455,8 +480,8 @@ def sair_grupo():
                 return
 
         supabase.table("membros_grupo").delete().eq("user_id", current_user_id).execute()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Falha ao sair do grupo: %s", e)
 
 def remover_membro(user_id: str):
     """Admin remove um membro específico do grupo."""
@@ -497,8 +522,8 @@ def dissolver_grupo():
         if grupo["criador_id"] != current_user_id:
             raise Exception("Somente o administrador do grupo pode dissolvê-lo.")
         supabase.table("grupos").delete().eq("id", grupo["id"]).execute()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Falha ao dissolver o grupo: %s", e)
 
 
 

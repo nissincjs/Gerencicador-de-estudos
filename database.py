@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timezone
 from constants import DB_FILE, C_RED, C_RESET, C_YELLOW, C_GREEN, C_BOLD
 from utils import print_override as print, input_override as input
+from calculo import obter_fator
 
 MAX_BACKUPS = 3
 BACKUP_SUFIXO = ".backup"
@@ -53,13 +54,6 @@ def _carregar_json(caminho):
     except Exception:
         pass
     return None
-
-def obter_fator(m):
-    """Calcula o fator de prioridade da matéria."""
-    qp = m.get("questoes_prova", 10.0)
-    pq = m.get("peso_questao", 1.0)
-    dif = m.get("dificuldade", 1.0)
-    return qp * pq * dif
 
 def novo_ciclo() -> dict:
     """Retorna um ciclo de estudos vazio (novo usuário / sem dados)."""
