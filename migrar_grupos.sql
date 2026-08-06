@@ -23,12 +23,22 @@ CREATE TABLE IF NOT EXISTS membros_grupo (
 CREATE INDEX IF NOT EXISTS idx_membros_grupo_grupo_id ON membros_grupo(grupo_id);
 
 -- 3. Migração automática de duplas existentes (parceiro_id) → grupos de 2
+--    Só roda se a coluna parceiro_id ainda existir (pode já ter sido removida).
 DO $$
 DECLARE
     p RECORD;
     novo_grupo_id UUID;
     novo_codigo TEXT;
+    tem_coluna_parceiro BOOLEAN;
 BEGIN
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'perfis_usuario'
+          AND column_name = 'parceiro_id'
+    ) INTO tem_coluna_parceiro;
+
+    IF tem_coluna_parceiro THEN
     FOR p IN
         SELECT * FROM perfis_usuario
         WHERE parceiro_id IS NOT NULL
@@ -64,21 +74,34 @@ BEGIN
             ON CONFLICT (user_id) DO NOTHING;
         END IF;
     END LOOP;
+    END IF;
 END $$;
 
--- 4. (Opcional) Políticas de RLS, caso seu projeto tenha RLS habilitado.
---    Se o projeto atual NÃO usa RLS (padrão destas tabelas), pode ignorar.
---
--- ALTER TABLE grupos ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE membros_grupo ENABLE ROW LEVEL SECURITY;
---
--- CREATE POLICY grupos_select ON grupos FOR SELECT USING (true);
--- CREATE POLICY grupos_insert ON grupos FOR INSERT WITH CHECK (true);
--- CREATE POLICY grupos_update ON grupos FOR UPDATE USING (true);
---
--- CREATE POLICY membros_select ON membros_grupo FOR SELECT USING (true);
--- CREATE POLICY membros_insert ON membros_grupo FOR INSERT WITH CHECK (true);
--- CREATE POLICY membros_delete ON membros_grupo FOR DELETE USING (true);
+-- 4. Garante acesso do app às tabelas de grupos via RLS.
+--    Habilita RLS (caso ainda esteja desligado) e cria políticas permissivas,
+--    replicando o mesmo nível de acesso das demais tabelas do app.
+ALTER TABLE grupos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membros_grupo ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS grupos_select ON grupos;
+DROP POLICY IF EXISTS grupos_insert ON grupos;
+DROP POLICY IF EXISTS grupos_update ON grupos;
+DROP POLICY IF EXISTS grupos_delete ON grupos;
+
+DROP POLICY IF EXISTS membros_select ON membros_grupo;
+DROP POLICY IF EXISTS membros_insert ON membros_grupo;
+DROP POLICY IF EXISTS membros_update ON membros_grupo;
+DROP POLICY IF EXISTS membros_delete ON membros_grupo;
+
+CREATE POLICY grupos_select ON grupos FOR SELECT USING (true);
+CREATE POLICY grupos_insert ON grupos FOR INSERT WITH CHECK (true);
+CREATE POLICY grupos_update ON grupos FOR UPDATE USING (true);
+CREATE POLICY grupos_delete ON grupos FOR DELETE USING (true);
+
+CREATE POLICY membros_select ON membros_grupo FOR SELECT USING (true);
+CREATE POLICY membros_insert ON membros_grupo FOR INSERT WITH CHECK (true);
+CREATE POLICY membros_update ON membros_grupo FOR UPDATE USING (true);
+CREATE POLICY membros_delete ON membros_grupo FOR DELETE USING (true);
 
 -- 5. Remove a coluna antiga parceiro_id.
 --    A política de RLS "Permitir leitura ao proprietário ou parceiro" depende
@@ -105,8 +128,8 @@ USING (
     )
 );
 
--- 5.3 Remove a coluna antiga
-ALTER TABLE perfis_usuario DROP COLUMN parceiro_id;
+-- 5.3 Remove a coluna antiga (se ainda existir)
+ALTER TABLE perfis_usuario DROP COLUMN IF EXISTS parceiro_id;
 
 -- 5.4 Verificação: deve retornar 0 linhas (nenhuma política referenciando parceiro_id)
 SELECT p.polname, p.polrelid::regclass
